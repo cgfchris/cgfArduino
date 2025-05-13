@@ -37,16 +37,16 @@ void ui_MainScreen_screen_init(void)
     lv_label_set_text(ui_Label2, "Current Temp:");
     lv_obj_set_style_text_font(ui_Label2, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    ui_mainTemp = lv_label_create(ui_MainScreen);
-    lv_obj_set_width(ui_mainTemp, LV_SIZE_CONTENT);   /// 1
-    lv_obj_set_height(ui_mainTemp, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_mainTemp, -113);
-    lv_obj_set_y(ui_mainTemp, -42);
-    lv_obj_set_align(ui_mainTemp, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_mainTemp, "25.0");
-    lv_obj_set_style_text_color(ui_mainTemp, lv_color_hex(0xEC0E0E), LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_opa(ui_mainTemp, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
-    lv_obj_set_style_text_font(ui_mainTemp, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
+    ui_tempLabel = lv_label_create(ui_MainScreen);
+    lv_obj_set_width(ui_tempLabel, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_tempLabel, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_tempLabel, -113);
+    lv_obj_set_y(ui_tempLabel, -42);
+    lv_obj_set_align(ui_tempLabel, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_tempLabel, "25.0");
+    lv_obj_set_style_text_color(ui_tempLabel, lv_color_hex(0xEC0E0E), LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_opa(ui_tempLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
+    lv_obj_set_style_text_font(ui_tempLabel, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_tempChart = lv_chart_create(ui_MainScreen);
     lv_obj_set_width(ui_tempChart, 383);
@@ -61,10 +61,6 @@ void ui_MainScreen_screen_init(void)
     lv_chart_set_axis_tick(ui_tempChart, LV_CHART_AXIS_PRIMARY_X, 10, 5, 5, 2, true, 50);
     lv_chart_set_axis_tick(ui_tempChart, LV_CHART_AXIS_PRIMARY_Y, 10, 5, 5, 2, true, 50);
     lv_chart_set_axis_tick(ui_tempChart, LV_CHART_AXIS_SECONDARY_Y, 0, 0, 0, 0, false, 25);
-    lv_chart_series_t * ui_tempChart_series_1 = lv_chart_add_series(ui_tempChart, lv_color_hex(0xF21111),
-                                                                    LV_CHART_AXIS_PRIMARY_Y);
-    static lv_coord_t ui_tempChart_series_1_array[] = { 25, 25, 25, 25, 25, 25 };
-    lv_chart_set_ext_y_array(ui_tempChart, ui_tempChart_series_1, ui_tempChart_series_1_array);
 
     ui_date = lv_label_create(ui_MainScreen);
     lv_obj_set_width(ui_date, LV_SIZE_CONTENT);   /// 1

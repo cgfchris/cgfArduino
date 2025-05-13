@@ -14,7 +14,7 @@ lv_obj_t * ui_MainScreen;
 lv_obj_t * ui_Panel1;
 lv_obj_t * ui_Image1;
 lv_obj_t * ui_Label2;
-lv_obj_t * ui_mainTemp;
+lv_obj_t * ui_tempLabel;
 lv_obj_t * ui_tempChart;
 lv_obj_t * ui_date;
 lv_obj_t * ui_time;

@@ -465,7 +465,7 @@
               {
                 "nid": 10,
                 "strtype": "OBJECT/Name",
-                "strval": "mainTemp",
+                "strval": "tempLabel",
                 "InheritedType": 10
               },
               {
@@ -1574,7 +1574,7 @@
     "uiExportFolderPath": "/home/chris/Documents/cgfArduino/libraries/ui/src",
     "projectExportFolderPath": "/home/chris/Documents/cgfArduino/tempController2.0",
     "custom_variable_prefix": "uic",
-    "backup_cnt": 6,
+    "backup_cnt": 7,
     "autosave_cnt": 0,
     "group_color_cnt": 0,
     "lvgl_version": "8.3.11",
