@@ -12,7 +12,7 @@
 #include "wifi_manager.h"
 #include "ntp_time.h"
 #include "temperature_system.h"
-// #include "lvgl_port.h" // If you create this for LVGL init
+
 
 // --- Global Hardware Objects ---
 Arduino_H7_Video Display(SCREEN_WIDTH, SCREEN_HEIGHT, GigaDisplayShield); // Use constants from config.h
@@ -44,11 +44,20 @@ void setup() {
 }
 
 void loop() {
-    lv_timer_handler(); // Crucial for LVGL animations, events, etc.
+    lv_timer_handler();
+    
+    manage_wifi_connection(); // Call this in every loop iteration
+    
+    // Only update NTP/other network dependent things if WiFi is connected
+    if (is_wifi_connected()) { // Use the new helper function
+        update_ntp_time_display(); 
+    } else {
+        // Optionally update UI to show NTP is waiting for WiFi
+        if (ui_time) lv_label_set_text(ui_time, "--:--:--");
+        if (ui_date) lv_label_set_text(ui_date, "No WiFi");
+    }
+    
+    updateTemperatureSystem(); // Temp system can run regardless of WiFi
 
-    update_wifi_status_display(); // From wifi_manager (e.g., update label if connection drops/reconnects)
-    update_ntp_time_display();    // From ntp_time (updates time on screen)
-    updateTemperatureSystem();    // From temperature_system (reads sensor, updates chart)
-
-    delay(5); // Small delay for stability, adjust as needed
+    delay(5);
 }

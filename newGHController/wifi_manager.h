@@ -2,19 +2,19 @@
 #ifndef WIFI_MANAGER_H
 #define WIFI_MANAGER_H
 
-#include <Arduino.h> // For String, delay, etc.
-#include <WiFi.h>    // For WiFi related functions
+#include <Arduino.h>
+#include <WiFi.h>
 
-// Function to initialize WiFi connection
+// Function to initialize WiFi connection (called once in setup)
 void initialize_wifi();
 
-// Function to print WiFi status (optional, if you want to call it manually)
+// Function to print WiFi status (optional for debugging)
 void print_wifi_status();
 
-// Function to update any WiFi related UI elements (e.g., status label)
-void update_wifi_status_display();
+// Function to be called in the main loop to manage WiFi connection and UI
+void manage_wifi_connection(); // Changed from update_wifi_status_display
 
-// Expose status if needed by other modules (less ideal, prefer functions)
-// extern int wifi_status;
+// Function to check if WiFi is currently connected
+bool is_wifi_connected();
 
 #endif // WIFI_MANAGER_H
