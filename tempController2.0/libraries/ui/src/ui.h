@@ -31,10 +31,11 @@ extern lv_obj_t * ui_MainScreen;
 extern lv_obj_t * ui_Panel1;
 extern lv_obj_t * ui_Image1;
 extern lv_obj_t * ui_Label2;
-extern lv_obj_t * ui_mainTemp;
+extern lv_obj_t * ui_tempLabel;
 extern lv_obj_t * ui_tempChart;
 extern lv_obj_t * ui_date;
 extern lv_obj_t * ui_time;
+extern lv_obj_t * ui_statusLabel;
 // CUSTOM VARIABLES
 
 // EVENTS

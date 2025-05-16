@@ -47,8 +47,8 @@
                 "flags": 17,
                 "strtype": "OBJECT/Position",
                 "intarray": [
-                  -219,
-                  -118
+                  0,
+                  -273
                 ],
                 "InheritedType": 7
               },
@@ -175,8 +175,8 @@
                 "flags": 17,
                 "strtype": "OBJECT/Position",
                 "intarray": [
-                  -224,
-                  -141
+                  0,
+                  -300
                 ],
                 "InheritedType": 7
               },
@@ -338,8 +338,8 @@
                 "flags": 17,
                 "strtype": "OBJECT/Position",
                 "intarray": [
-                  -281,
-                  -42
+                  -43,
+                  -196
                 ],
                 "InheritedType": 7
               },
@@ -496,8 +496,8 @@
                 "flags": 17,
                 "strtype": "OBJECT/Position",
                 "intarray": [
-                  -113,
-                  -42
+                  109,
+                  -196
                 ],
                 "InheritedType": 7
               },
@@ -666,8 +666,8 @@
                 "flags": 17,
                 "strtype": "OBJECT/Position",
                 "intarray": [
-                  180,
-                  -160
+                  0,
+                  281
                 ],
                 "InheritedType": 7
               },
@@ -896,7 +896,7 @@
               {
                 "nid": 1240,
                 "strtype": "CHART/ChartData",
-                "strval": "[{\"Axis\":0,\"Color\":[242,17,17,255],\"Series\":[25,25,25,25,25,25]}]",
+                "strval": "[]",
                 "InheritedType": 12
               },
               {
@@ -982,8 +982,8 @@
                 "flags": 17,
                 "strtype": "OBJECT/Position",
                 "intarray": [
-                  -225,
-                  64
+                  0,
+                  -90
                 ],
                 "InheritedType": 7
               },
@@ -1141,8 +1141,8 @@
                 "flags": 17,
                 "strtype": "OBJECT/Position",
                 "intarray": [
-                  -228,
-                  25
+                  0,
+                  -129
                 ],
                 "InheritedType": 7
               },
@@ -1300,8 +1300,8 @@
                 "flags": 17,
                 "strtype": "OBJECT/Position",
                 "intarray": [
-                  175,
-                  -31
+                  0,
+                  -51
                 ],
                 "InheritedType": 7
               },
@@ -1420,8 +1420,8 @@
           }
         ],
         "isPage": true,
-        "editor_posx": 1000,
-        "editor_posy": -1000,
+        "editor_posx": 600,
+        "editor_posy": -600,
         "dont_export": false,
         "locked": false,
         "properties": [
@@ -1504,6 +1504,7 @@
           },
           {
             "nid": 1010,
+            "flags": 1048576,
             "strtype": "SCREEN/Screen",
             "InheritedType": 1
           },
@@ -1550,9 +1551,9 @@
   "info": {
     "name": "tempController2.0.spj",
     "depth": 1,
-    "width": 800,
-    "height": 480,
-    "rotation": 0,
+    "width": 480,
+    "height": 800,
+    "rotation": 90,
     "offset_x": 0,
     "offset_y": 0,
     "shape": "RECTANGLE",
@@ -1574,7 +1575,7 @@
     "uiExportFolderPath": "/home/chris/Documents/cgfArduino/libraries/ui/src",
     "projectExportFolderPath": "/home/chris/Documents/cgfArduino/tempController2.0",
     "custom_variable_prefix": "uic",
-    "backup_cnt": 7,
+    "backup_cnt": 12,
     "autosave_cnt": 0,
     "group_color_cnt": 0,
     "lvgl_version": "8.3.11",

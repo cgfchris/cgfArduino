@@ -52,7 +52,7 @@ void ui_MainScreen_screen_init(void)
     lv_obj_set_width(ui_tempChart, 383);
     lv_obj_set_height(ui_tempChart, 123);
     lv_obj_set_x(ui_tempChart, 0);
-    lv_obj_set_y(ui_tempChart, 280);
+    lv_obj_set_y(ui_tempChart, 281);
     lv_obj_set_align(ui_tempChart, LV_ALIGN_CENTER);
     lv_chart_set_type(ui_tempChart, LV_CHART_TYPE_LINE);
     lv_chart_set_point_count(ui_tempChart, 100);
@@ -61,10 +61,6 @@ void ui_MainScreen_screen_init(void)
     lv_chart_set_axis_tick(ui_tempChart, LV_CHART_AXIS_PRIMARY_X, 10, 5, 5, 2, true, 50);
     lv_chart_set_axis_tick(ui_tempChart, LV_CHART_AXIS_PRIMARY_Y, 10, 5, 5, 2, true, 50);
     lv_chart_set_axis_tick(ui_tempChart, LV_CHART_AXIS_SECONDARY_Y, 0, 0, 0, 0, false, 25);
-    lv_chart_series_t * ui_tempChart_series_1 = lv_chart_add_series(ui_tempChart, lv_color_hex(0xF21111),
-                                                                    LV_CHART_AXIS_PRIMARY_Y);
-    static lv_coord_t ui_tempChart_series_1_array[] = { 25, 25, 25, 25, 25, 25 };
-    lv_chart_set_ext_y_array(ui_tempChart, ui_tempChart_series_1, ui_tempChart_series_1_array);
 
     ui_date = lv_label_create(ui_MainScreen);
     lv_obj_set_width(ui_date, LV_SIZE_CONTENT);   /// 1
