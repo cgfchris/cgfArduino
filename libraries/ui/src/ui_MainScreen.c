@@ -13,8 +13,8 @@ void ui_MainScreen_screen_init(void)
     ui_Panel1 = lv_obj_create(ui_MainScreen);
     lv_obj_set_width(ui_Panel1, 351);
     lv_obj_set_height(ui_Panel1, 238);
-    lv_obj_set_x(ui_Panel1, -219);
-    lv_obj_set_y(ui_Panel1, -118);
+    lv_obj_set_x(ui_Panel1, 0);
+    lv_obj_set_y(ui_Panel1, -273);
     lv_obj_set_align(ui_Panel1, LV_ALIGN_CENTER);
     lv_obj_clear_flag(ui_Panel1, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
 
@@ -22,8 +22,8 @@ void ui_MainScreen_screen_init(void)
     lv_img_set_src(ui_Image1, &ui_img_cgflogo_png);
     lv_obj_set_width(ui_Image1, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_Image1, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_Image1, -224);
-    lv_obj_set_y(ui_Image1, -141);
+    lv_obj_set_x(ui_Image1, 0);
+    lv_obj_set_y(ui_Image1, -300);
     lv_obj_set_align(ui_Image1, LV_ALIGN_CENTER);
     lv_obj_add_flag(ui_Image1, LV_OBJ_FLAG_ADV_HITTEST);     /// Flags
     lv_obj_clear_flag(ui_Image1, LV_OBJ_FLAG_SCROLLABLE);      /// Flags
@@ -31,8 +31,8 @@ void ui_MainScreen_screen_init(void)
     ui_Label2 = lv_label_create(ui_MainScreen);
     lv_obj_set_width(ui_Label2, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_Label2, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_Label2, -281);
-    lv_obj_set_y(ui_Label2, -42);
+    lv_obj_set_x(ui_Label2, -43);
+    lv_obj_set_y(ui_Label2, -196);
     lv_obj_set_align(ui_Label2, LV_ALIGN_CENTER);
     lv_label_set_text(ui_Label2, "Current Temp:");
     lv_obj_set_style_text_font(ui_Label2, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -40,8 +40,8 @@ void ui_MainScreen_screen_init(void)
     ui_tempLabel = lv_label_create(ui_MainScreen);
     lv_obj_set_width(ui_tempLabel, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_tempLabel, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_tempLabel, -113);
-    lv_obj_set_y(ui_tempLabel, -42);
+    lv_obj_set_x(ui_tempLabel, 109);
+    lv_obj_set_y(ui_tempLabel, -196);
     lv_obj_set_align(ui_tempLabel, LV_ALIGN_CENTER);
     lv_label_set_text(ui_tempLabel, "25.0");
     lv_obj_set_style_text_color(ui_tempLabel, lv_color_hex(0xEC0E0E), LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -51,8 +51,8 @@ void ui_MainScreen_screen_init(void)
     ui_tempChart = lv_chart_create(ui_MainScreen);
     lv_obj_set_width(ui_tempChart, 383);
     lv_obj_set_height(ui_tempChart, 123);
-    lv_obj_set_x(ui_tempChart, 180);
-    lv_obj_set_y(ui_tempChart, -160);
+    lv_obj_set_x(ui_tempChart, 0);
+    lv_obj_set_y(ui_tempChart, 280);
     lv_obj_set_align(ui_tempChart, LV_ALIGN_CENTER);
     lv_chart_set_type(ui_tempChart, LV_CHART_TYPE_LINE);
     lv_chart_set_point_count(ui_tempChart, 100);
@@ -61,12 +61,16 @@ void ui_MainScreen_screen_init(void)
     lv_chart_set_axis_tick(ui_tempChart, LV_CHART_AXIS_PRIMARY_X, 10, 5, 5, 2, true, 50);
     lv_chart_set_axis_tick(ui_tempChart, LV_CHART_AXIS_PRIMARY_Y, 10, 5, 5, 2, true, 50);
     lv_chart_set_axis_tick(ui_tempChart, LV_CHART_AXIS_SECONDARY_Y, 0, 0, 0, 0, false, 25);
+    lv_chart_series_t * ui_tempChart_series_1 = lv_chart_add_series(ui_tempChart, lv_color_hex(0xF21111),
+                                                                    LV_CHART_AXIS_PRIMARY_Y);
+    static lv_coord_t ui_tempChart_series_1_array[] = { 25, 25, 25, 25, 25, 25 };
+    lv_chart_set_ext_y_array(ui_tempChart, ui_tempChart_series_1, ui_tempChart_series_1_array);
 
     ui_date = lv_label_create(ui_MainScreen);
     lv_obj_set_width(ui_date, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_date, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_date, -225);
-    lv_obj_set_y(ui_date, 64);
+    lv_obj_set_x(ui_date, 0);
+    lv_obj_set_y(ui_date, -90);
     lv_obj_set_align(ui_date, LV_ALIGN_CENTER);
     lv_label_set_text(ui_date, "May 12, 2025");
     lv_obj_set_style_text_font(ui_date, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -74,8 +78,8 @@ void ui_MainScreen_screen_init(void)
     ui_time = lv_label_create(ui_MainScreen);
     lv_obj_set_width(ui_time, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_time, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_time, -228);
-    lv_obj_set_y(ui_time, 25);
+    lv_obj_set_x(ui_time, 0);
+    lv_obj_set_y(ui_time, -129);
     lv_obj_set_align(ui_time, LV_ALIGN_CENTER);
     lv_label_set_text(ui_time, "18:45:00");
     lv_obj_set_style_text_font(ui_time, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
@@ -83,8 +87,8 @@ void ui_MainScreen_screen_init(void)
     ui_statusLabel = lv_label_create(ui_MainScreen);
     lv_obj_set_width(ui_statusLabel, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_statusLabel, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_statusLabel, 175);
-    lv_obj_set_y(ui_statusLabel, -31);
+    lv_obj_set_x(ui_statusLabel, 0);
+    lv_obj_set_y(ui_statusLabel, -51);
     lv_obj_set_align(ui_statusLabel, LV_ALIGN_CENTER);
     lv_label_set_text(ui_statusLabel, "status	");
     lv_obj_set_style_text_font(ui_statusLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);

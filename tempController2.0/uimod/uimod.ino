@@ -1,12 +1,16 @@
 #include "Arduino_H7_Video.h"
 #include "Arduino_GigaDisplayTouch.h"
+#include "lv_conf.h"
 #include "lvgl.h"
 #include <ui.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
+#include <stdio.h>   // For snprintf
+#include <math.h>    // For NAN if used
+#include <time.h>    // For time_t, struct tm, strftime
 #include <mbed_mktime.h>
 
-Arduino_H7_Video Display( 800, 480, GigaDisplayShield ); //( 800, 480, GigaDisplayShield );
+Arduino_H7_Video Display( 480, 800, GigaDisplayShield ); //( 800, 480, GigaDisplayShield );
 Arduino_GigaDisplayTouch TouchDetector;
 
 // wifi setup
@@ -26,22 +30,45 @@ constexpr unsigned long printInterval{ 1000 };
 unsigned long printNow{};
 char statusLabelBuffer[50]; 
 
-// --- temp Configuration ---
+// ai code starts here
+// --- Configuration ---
 const unsigned long TEMP_READ_INTERVAL = 2000;     // How often to read temp & update label (milliseconds)
 //const unsigned long TEMP_SAMPLE_INTERVAL = 5 * 60 * 1000; // How often to store a sample for the graph (5 minutes)
 const unsigned long TEMP_SAMPLE_INTERVAL = 10 * 1000; // Faster interval for TESTING (10 seconds)
 const int MAX_TEMP_SAMPLES = 100;                  // Number of samples to store and plot
 
-lv_chart_series_t *ui_tempChartSeries; // Pointer for the chart data series
+// Chart Y-axis range values
+const lv_coord_t CHART_Y_MIN_VALUE = 0; // Your desired minimum Y value for the chart (e.g., 10°C)
+const lv_coord_t CHART_Y_MAX_VALUE = 50; // Your desired maximum Y value for the chart (e.g., 35°C)
+
+// Time validation constant
+const time_t MIN_VALID_EPOCH_TIME = 1672531200L; // Jan 1, 2023 00:00:00 UTC - a reasonable "after this time is valid" check
+
+// --- Structure to hold sample data ---
+struct TempSampleData {
+    float temperature;       // The temperature reading
+    time_t timestamp;        // Unix timestamp of when the sample was taken
+    bool isValidTimestamp;   // True if the timestamp is considered valid (e.g., post-NTP sync)
+};
+
+// --- Global Variables ---
+// LVGL Objects (assumed to be created by ui_init() or similar)
+// extern lv_obj_t *ui_tempLabel; // Should be declared in ui.h if using SquareLine Studio
+// extern lv_obj_t *ui_tempChart; // Should be declared in ui.h if using SquareLine Studio
+lv_chart_series_t *ui_tempChartSeries = NULL; // Pointer for the chart data series
+
 // Temperature Data
-float currentTemperature = 0.0f;
-float tempSamples[MAX_TEMP_SAMPLES]; // Array to store historical temperature data
-int tempSampleCount = 0;            // How many valid samples are currently stored
-// Buffer for label formatting
-char tempLabelBuffer[32];
+float currentTemperature = NAN; // Initialize current temperature to Not-A-Number
+TempSampleData historicalSamples[MAX_TEMP_SAMPLES]; // Array to store historical temperature data
+int validSamplesCurrentlyStored = 0; // Tracks how many valid samples have been added to historicalSamples (mainly for initial filling logic if needed)
+
 // Timing
 unsigned long lastTempReadTime = 0;
 unsigned long lastSampleTime = 0;
+
+// Buffer for label formatting
+char tempLabelBuffer[32];
+
 
 void setup() {
   Serial.begin(115200);
@@ -101,159 +128,6 @@ void loop()
   }
   delay(0.5);
 }
-
-// --- Initialization (Call this ONCE in your setup() after ui_init()) ---
-void initializeTemperatureSystem() {
-  // Initialize the sample array with a value indicating no data yet
-  // NAN (Not a Number) is suitable if using floats. LVGL chart might ignore NAN.
-  // Alternatively, use 0 or a value outside your expected range.
-  for (int i = 0; i < MAX_TEMP_SAMPLES; i++) {
-    tempSamples[i] = NAN; // Or 0.0f;
-  }
-  tempSampleCount = 0; // Reset sample count
-
-  // Check if the chart object exists (created by ui_init)
-  if (ui_tempChart != NULL) {
-    // Configure the chart appearance (optional customization)
-    lv_chart_set_type(ui_tempChart, LV_CHART_TYPE_LINE); // Or LV_CHART_TYPE_BAR
-    lv_chart_set_update_mode(ui_tempChart, LV_CHART_UPDATE_MODE_SHIFT); // Makes adding new points easy
-    lv_chart_set_point_count(ui_tempChart, MAX_TEMP_SAMPLES); // Tell chart how many points to expect
-    lv_chart_set_div_line_count(ui_tempChart, 5, 5); // Example: 5 horizontal, 5 vertical division lines
-
-    // Set the Y-axis range (Adjust min/max to your expected temperature range in C or F)
-    lv_chart_set_range(ui_tempChart, LV_CHART_AXIS_PRIMARY_Y, 0, 50); // Example: 10°C to 35°C
-
-    // Add a data series to the chart
-    ui_tempChartSeries = lv_chart_add_series(ui_tempChart, lv_palette_main(LV_PALETTE_RED), LV_CHART_AXIS_PRIMARY_Y);
-
-    // Initialize chart points (set all initially to the bottom of the range or NAN if handled)
-    // lv_chart_set_all_value(ui_tempChart, ui_tempChartSeries, 0); // Set all points to 0 initially
-    // Or, if using NAN, you might need to manually set points if NAN isn't drawn nicely
-    for (int i = 0; i < MAX_TEMP_SAMPLES; i++) {
-         lv_chart_set_next_value(ui_tempChart, ui_tempChartSeries, -100.0); // Set initial points to min range
-    }
-
-
-    // Refresh the chart to apply changes
-    //lv_obj_refresh_ext_draw_size(ui_tempChart); // Deprecated in newer LVGL
-    lv_obj_invalidate(ui_tempChart); // Mark object for redraw
-
-    Serial.println("Temperature Chart Initialized.");
-
-  } else {
-     Serial.println("Error: ui_tempChart object not found!");
-  }
-
-  // Initialize timing
-  lastTempReadTime = millis();
-  lastSampleTime = millis(); // Start timers now
-
-   // Initial Temperature Read and Label Update
-   currentTemperature = readTemperatureSensor();
-   if (ui_tempLabel != NULL && !isnan(currentTemperature)) {
-       snprintf(tempLabelBuffer, sizeof(tempLabelBuffer), "%.1f C", currentTemperature); // Format to 1 decimal place
-       lv_label_set_text(ui_tempLabel, tempLabelBuffer);
-   } else if (ui_tempLabel != NULL) {
-        lv_label_set_text(ui_tempLabel, "--.- C"); // Show placeholder if initial read fails
-   }
-}
-
-// --- Update Function (Call this REPEATEDLY in your main loop()) ---
-void updateTemperatureSystem() {
-  unsigned long currentTime = millis();
-
-  // --- 1. Read Temperature and Update Label (Frequently) ---
-  if (currentTime - lastTempReadTime >= TEMP_READ_INTERVAL) {
-    lastTempReadTime = currentTime;
-
-    currentTemperature = readTemperatureSensor(); // Get the latest reading
-
-    // Check if the reading is valid (not NAN)
-    if (!isnan(currentTemperature)) {
-      // Format the temperature string (e.g., "23.5 C")
-      // Use %d if your sensor gives integers, %.1f for 1 decimal, %.2f for 2 etc.
-      snprintf(tempLabelBuffer, sizeof(tempLabelBuffer), "%.1f C", currentTemperature); // Change "C" to "F" if needed
-
-      // Update the LVGL label (check if it exists)
-      if (ui_tempLabel != NULL) {
-        lv_label_set_text(ui_tempLabel, tempLabelBuffer);
-         // Serial.print("Updated Temp Label: "); Serial.println(tempLabelBuffer); // Debug
-      } else {
-         // Serial.println("Warning: ui_tempLabel is NULL!"); // Debug
-      }
-    } else {
-       // Handle failed sensor reading on the label
-        if (ui_tempLabel != NULL) {
-            lv_label_set_text(ui_tempLabel, "Err C");
-        }
-        Serial.println("Sensor read returned NAN."); // Debug
-    }
-  }
-
-  // --- 2. Store Sample and Update Graph (Infrequently) ---
-  if (currentTime - lastSampleTime >= TEMP_SAMPLE_INTERVAL) {
-    lastSampleTime = currentTime;
-
-    // Make sure the last read temperature is valid before sampling
-    if (!isnan(currentTemperature)) {
-      Serial.print("Sampling temperature: "); Serial.println(currentTemperature); // Debug
-
-      // We use the chart's SHIFT update mode. We just need to feed it the next value.
-      // LVGL will handle shifting the old data points automatically.
-      if (ui_tempChart != NULL && ui_tempChartSeries != NULL) {
-         // Convert float temperature to lv_coord_t (usually int16_t).
-         // You might need scaling if your range is large or needs high precision,
-         // but direct casting often works for typical temperature ranges.
-         lv_coord_t chartValue = (lv_coord_t)round(currentTemperature); // Round to nearest integer for chart
-
-         // Add the new value to the chart; LVGL shifts the old ones
-         lv_chart_set_next_value(ui_tempChart, ui_tempChartSeries, chartValue);
-
-         // Optional: Refresh the chart immediately if needed, but lv_timer_handler should cover it
-         // lv_obj_invalidate(ui_tempChart);
-
-         Serial.print("Added to chart: "); Serial.println(chartValue); // Debug
-      } else {
-         Serial.println("Warning: ui_tempChart or ui_tempChartSeries is NULL!"); // Debug
-      }
-
-
-      // --- Optional: Store in our own array too (if needed for other calculations) ---
-      // This part is now less critical if the chart handles the history via SHIFT mode,
-      // but you might want the raw float data accessible elsewhere.
-      if (tempSampleCount < MAX_TEMP_SAMPLES) {
-          // Still filling the array initially
-          tempSamples[tempSampleCount] = currentTemperature;
-          tempSampleCount++;
-      } else {
-          // Array is full, shift elements manually to discard the oldest
-          // (More complex than letting the chart handle it with SHIFT mode)
-          for (int i = 0; i < MAX_TEMP_SAMPLES - 1; i++) {
-              tempSamples[i] = tempSamples[i + 1];
-          }
-          tempSamples[MAX_TEMP_SAMPLES - 1] = currentTemperature;
-      }
-      // --- End Optional Manual Array Storage ---
-
-    } else {
-       Serial.println("Skipping sample due to invalid temperature reading (NAN).");
-       // Optional: Add a 'gap' or placeholder value to the chart here if desired
-       // if (ui_tempChart != NULL && ui_tempChartSeries != NULL) {
-       //    lv_chart_set_next_value(ui_tempChart, ui_tempChartSeries, lv_chart_get_y_range(ui_tempChart, LV_CHART_AXIS_PRIMARY_Y).min); // Add point at min value
-       // }
-    }
-  }
-}
-
-
-float readTemperatureSensor() {
-  // --- Example Simulation (Remove this block) ---
-  // Simulates a fluctuating temperature for testing
-  // Returns degrees Celsius
-  float simulatedTemp = 20.0 + 5.0 * sin(millis() / 30000.0);
-  return simulatedTemp;
-}
-
 
 void setNtpTime() {
   udp.begin(localPort);
@@ -347,4 +221,277 @@ void printWifiStatus() {
   Serial.print("signal strength (RSSI):");
   Serial.print(rssi);
   Serial.println(" dBm");
+}
+
+// AI functions:  
+/*
+#include <lvgl.h>
+#include <ui.h>          // Assuming this declares ui_tempLabel and ui_tempChart
+#include <stdio.h>       // For snprintf
+#include <math.h>        // For isnan, round
+#include <time.h>        // For time_t, struct tm, strftime, time()
+#include <mbed_mktime.h> // For _rtc_localtime on Portenta/Giga (or your platform's equivalent)
+
+// --- Configuration ---
+const unsigned long TEMP_READ_INTERVAL = 2000;     // How often to read temp & update label (milliseconds)
+const unsigned long TEMP_SAMPLE_INTERVAL = 5 * 60 * 1000; // How often to store a sample for the graph (5 minutes)
+// const unsigned long TEMP_SAMPLE_INTERVAL = 10 * 1000; // Faster interval for TESTING (10 seconds)
+const int MAX_TEMP_SAMPLES = 100;                  // Number of samples to store and plot
+
+// Chart Y-axis range values
+const lv_coord_t CHART_Y_MIN_VALUE = 10; // Your desired minimum Y value for the chart (e.g., 10°C)
+const lv_coord_t CHART_Y_MAX_VALUE = 35; // Your desired maximum Y value for the chart (e.g., 35°C)
+
+// Time validation constant
+const time_t MIN_VALID_EPOCH_TIME = 1672531200L; // Jan 1, 2023 00:00:00 UTC - a reasonable "after this time is valid" check
+
+// --- Structure to hold sample data ---
+struct TempSampleData {
+    float temperature;       // The temperature reading
+    time_t timestamp;        // Unix timestamp of when the sample was taken
+    bool isValidTimestamp;   // True if the timestamp is considered valid (e.g., post-NTP sync)
+};
+
+// --- Global Variables ---
+// LVGL Objects (assumed to be created by ui_init() or similar)
+// extern lv_obj_t *ui_tempLabel; // Should be declared in ui.h if using SquareLine Studio
+// extern lv_obj_t *ui_tempChart; // Should be declared in ui.h if using SquareLine Studio
+lv_chart_series_t *ui_tempChartSeries = NULL; // Pointer for the chart data series
+
+// Temperature Data
+float currentTemperature = NAN; // Initialize current temperature to Not-A-Number
+TempSampleData historicalSamples[MAX_TEMP_SAMPLES]; // Array to store historical temperature data
+int validSamplesCurrentlyStored = 0; // Tracks how many valid samples have been added to historicalSamples (mainly for initial filling logic if needed)
+
+// Timing
+unsigned long lastTempReadTime = 0;
+unsigned long lastSampleTime = 0;
+
+// Buffer for label formatting
+char tempLabelBuffer[32];
+
+*/
+
+// --- Placeholder Sensor Function ---
+// !! REPLACE THIS with your actual sensor reading code !!
+float readTemperatureSensor() {
+    // --- Example Simulation (Remove this block) ---
+    static float simulatedTempBase = 22.0; // Start at 22 degrees
+    int change = rand() % 3 - 1; // -1, 0, or 1
+    simulatedTempBase += (float)change * 0.5f; // Change by -0.5, 0, or +0.5
+    if (simulatedTempBase < CHART_Y_MIN_VALUE + 2) simulatedTempBase = CHART_Y_MIN_VALUE + 2; // Keep within a range
+    if (simulatedTempBase > CHART_Y_MAX_VALUE - 2) simulatedTempBase = CHART_Y_MAX_VALUE - 2;
+    // Occasionally return NAN to test that path
+    // if ((rand() % 20) == 0) return NAN;
+    return simulatedTempBase + (rand() % 100) / 150.0f; // Add small noise
+    // --- End Simulation ---
+}
+
+
+// --- Custom Draw Event for Chart X-Axis Tick Labels ---
+static void chart_x_axis_draw_event_cb(lv_event_t * e) {
+    lv_obj_draw_part_dsc_t * dsc = lv_event_get_draw_part_dsc(e);
+
+    // Check if we are drawing a tick label on the PRIMARY X axis
+    if (dsc->part == LV_PART_TICKS && dsc->id == LV_CHART_AXIS_PRIMARY_X && dsc->text != NULL) {
+        // dsc->value gives the index of the data point for this tick
+        // (0 for the oldest point currently visible on the chart, up to point_count-1 for the newest)
+        int chart_point_index = dsc->value;
+
+        // Our historicalSamples array is always shifted, so historicalSamples[chart_point_index]
+        // corresponds to the point LVGL is asking about.
+        if (chart_point_index >= 0 && chart_point_index < MAX_TEMP_SAMPLES &&
+            historicalSamples[chart_point_index].isValidTimestamp) {
+
+            time_t sample_ts = historicalSamples[chart_point_index].timestamp;
+            struct tm timeinfo;
+
+            // Convert timestamp to struct tm (local time)
+            _rtc_localtime(sample_ts, &timeinfo, RTC_FULL_LEAP_YEAR_SUPPORT); // For Portenta/Giga
+            // Or for standard C library:
+            // struct tm *timeinfo_ptr = localtime(&sample_ts);
+            // if (timeinfo_ptr) timeinfo = *timeinfo_ptr; else { lv_snprintf(dsc->text, dsc->text_length, "-ERR-"); return; }
+
+            char time_str_buffer[6]; // "HH:MM\0"
+            strftime(time_str_buffer, sizeof(time_str_buffer), "%H:%M", &timeinfo);
+
+            lv_snprintf(dsc->text, dsc->text_length, "%s", time_str_buffer);
+        } else {
+            // If no valid timestamp for this point, make the label a placeholder
+            lv_snprintf(dsc->text, dsc->text_length, "-:-");
+        }
+    }
+}
+
+
+// --- Initialization (Call this ONCE in your setup() after ui_init()) ---
+void initializeTemperatureSystem() {
+    // Initialize the historical sample array
+    for (int i = 0; i < MAX_TEMP_SAMPLES; i++) {
+        historicalSamples[i].temperature = NAN; // Or some other indicator of no data
+        historicalSamples[i].timestamp = 0;
+        historicalSamples[i].isValidTimestamp = false;
+    }
+    validSamplesCurrentlyStored = 0; // Reset counter
+
+    // Check if the chart object exists (created by ui_init)
+    if (ui_tempChart != NULL) {
+        lv_chart_set_type(ui_tempChart, LV_CHART_TYPE_LINE);
+        lv_chart_set_update_mode(ui_tempChart, LV_CHART_UPDATE_MODE_SHIFT);
+        lv_chart_set_point_count(ui_tempChart, MAX_TEMP_SAMPLES);
+
+        // Set the Y-axis range using the defined constants
+        lv_chart_set_range(ui_tempChart, LV_CHART_AXIS_PRIMARY_Y, CHART_Y_MIN_VALUE, CHART_Y_MAX_VALUE);
+
+        // Add a data series to the chart
+        ui_tempChartSeries = lv_chart_add_series(ui_tempChart, lv_palette_main(LV_PALETTE_BLUE), LV_CHART_AXIS_PRIMARY_Y);
+        if (!ui_tempChartSeries) {
+            Serial.println("Error: Failed to add series to chart!");
+            return; // Cannot proceed
+        }
+
+        // Initialize chart points to the minimum Y value
+        Serial.print("Initializing chart points to Y_MIN: "); Serial.println(CHART_Y_MIN_VALUE);
+        for (int i = 0; i < MAX_TEMP_SAMPLES; i++) {
+            lv_chart_set_next_value(ui_tempChart, ui_tempChartSeries, CHART_Y_MIN_VALUE);
+        }
+
+        // Configure X-Axis Ticks
+        uint8_t num_x_major_ticks = 5;    // Example: 5 labels
+        lv_coord_t major_tick_len = 10;   // Length of major tick lines
+        lv_coord_t minor_tick_len = 5;    // Length of minor tick lines
+        uint8_t num_minor_ticks_between_major = 2; // Example
+        bool draw_labels_for_major_ticks = true;
+        lv_coord_t extra_draw_space_for_labels = 20; // Or 15, 25 etc. Adjust this based on font size and label length.
+                                             // This is the space reserved for the labels below the x-axis.
+
+        lv_chart_set_axis_tick(ui_tempChart, LV_CHART_AXIS_PRIMARY_X,
+                       major_tick_len,
+                       minor_tick_len,
+                       num_x_major_ticks,
+                       num_minor_ticks_between_major,
+                       draw_labels_for_major_ticks,
+                       extra_draw_space_for_labels); // This is an lv_coord_t
+                       
+        // lv_obj_set_style_text_font(ui_tempChart, &lv_font_montserrat_10, LV_PART_TICKS | LV_STATE_DEFAULT);
+        // You might also want to set text color, etc. for LV_PART_TICKS
+        // lv_obj_set_style_text_color(ui_tempChart, lv_color_hex(0x808080), LV_PART_TICKS | LV_STATE_DEFAULT); // Example: Grey
+    
+        // Add the custom draw event callback for X-axis labels
+        lv_obj_add_event_cb(ui_tempChart, chart_x_axis_draw_event_cb, LV_EVENT_DRAW_PART_BEGIN, NULL);
+        
+        // In newer LVGL, invalidation is often sufficient. refresh_ext_draw_size is for older versions or complex cases.
+        // lv_obj_refresh_ext_draw_size(ui_tempChart); 
+        lv_obj_invalidate(ui_tempChart); // Mark object for redraw
+
+        Serial.println("Temperature Chart Initialized for Time-based X-Axis.");
+    } else {
+        Serial.println("Error: ui_tempChart object not found!");
+    }
+
+    // Initialize timing
+    lastTempReadTime = millis();
+    lastSampleTime = millis(); // Start timers now
+
+    // Initial Temperature Read and Label Update
+    currentTemperature = readTemperatureSensor();
+    if (ui_tempLabel != NULL) { // Check if label object exists
+        if (!isnan(currentTemperature)) {
+            snprintf(tempLabelBuffer, sizeof(tempLabelBuffer), "%.1f C", currentTemperature);
+            lv_label_set_text(ui_tempLabel, tempLabelBuffer);
+        } else {
+            lv_label_set_text(ui_tempLabel, "--.- C"); // Show placeholder if initial read fails
+        }
+    }
+}
+
+
+// --- Update Function (Call this REPEATEDLY in your main loop()) ---
+void updateTemperatureSystem() {
+    unsigned long currentTimeMs = millis();
+
+    // --- 1. Read Temperature and Update Label (Frequently) ---
+    if (currentTimeMs - lastTempReadTime >= TEMP_READ_INTERVAL) {
+        lastTempReadTime = currentTimeMs;
+
+        float newTempReading = readTemperatureSensor(); // Get the latest reading
+
+        if (!isnan(newTempReading)) {
+            currentTemperature = newTempReading; // Update global currentTemperature only if valid
+            snprintf(tempLabelBuffer, sizeof(tempLabelBuffer), "%.1f C", currentTemperature);
+            if (ui_tempLabel != NULL) { // Check if label object exists
+                lv_label_set_text(ui_tempLabel, tempLabelBuffer);
+            }
+        } else {
+            // Temperature reading failed (NAN)
+            // Keep 'currentTemperature' as its last valid value or initial NAN
+            if (ui_tempLabel != NULL) { // Check if label object exists
+                lv_label_set_text(ui_tempLabel, "Err C"); // Indicate error on label
+            }
+            Serial.println("Sensor read returned NAN for label update.");
+        }
+    }
+
+    // --- 2. Store Sample and Update Graph (Infrequently) ---
+    if (currentTimeMs - lastSampleTime >= TEMP_SAMPLE_INTERVAL) {
+        lastSampleTime = currentTimeMs;
+
+        time_t currentEpochTime = time(NULL); // Get time from system clock (hopefully set by NTP)
+        bool isTimeCurrentlyValid = (currentEpochTime > MIN_VALID_EPOCH_TIME);
+
+        // Shift all existing historical samples to the left to make space for the new one at the end.
+        // historicalSamples[0] is discarded, historicalSamples[MAX_TEMP_SAMPLES-1] is the new slot.
+        for (int i = 0; i < MAX_TEMP_SAMPLES - 1; i++) {
+            historicalSamples[i] = historicalSamples[i + 1];
+        }
+
+        // Prepare the newest sample data in the last slot of the array
+        int newestSampleIndex = MAX_TEMP_SAMPLES - 1;
+
+        if (!isnan(currentTemperature) && isTimeCurrentlyValid) {
+            // Valid temperature reading AND valid system time
+            Serial.print("Sampling temperature: "); Serial.print(currentTemperature);
+            Serial.print(" at valid time: "); Serial.println(currentEpochTime);
+
+            historicalSamples[newestSampleIndex].temperature = currentTemperature;
+            historicalSamples[newestSampleIndex].timestamp = currentEpochTime;
+            historicalSamples[newestSampleIndex].isValidTimestamp = true;
+
+            if (ui_tempChart != NULL && ui_tempChartSeries != NULL) {
+                lv_coord_t chartValue = (lv_coord_t)round(currentTemperature);
+                lv_chart_set_next_value(ui_tempChart, ui_tempChartSeries, chartValue);
+            }
+        } else {
+            // Either temperature is NAN or time is not (yet) valid
+            if (isnan(currentTemperature)) Serial.println("Skipping valid sample storage: currentTemperature is NAN.");
+            if (!isTimeCurrentlyValid) Serial.println("Skipping valid sample storage: currentEpochTime is not (yet) valid.");
+
+            // Store placeholder data in historicalSamples
+            historicalSamples[newestSampleIndex].temperature = isnan(currentTemperature) ? NAN : currentTemperature; // Store NAN or last good temp
+            historicalSamples[newestSampleIndex].timestamp = currentEpochTime; // Store time anyway, even if invalid
+            historicalSamples[newestSampleIndex].isValidTimestamp = false;     // Mark timestamp as not usable for labeling
+
+            // Update chart with a placeholder or last known good value
+            if (ui_tempChart != NULL && ui_tempChartSeries != NULL) {
+                lv_coord_t y_value_for_chart;
+                if (isnan(currentTemperature)) {
+                    y_value_for_chart = CHART_Y_MIN_VALUE; // If temp is NAN, plot at min_y
+                } else {
+                    y_value_for_chart = (lv_coord_t)round(currentTemperature); // Otherwise plot the (potentially old) currentTemperature
+                }
+                lv_chart_set_next_value(ui_tempChart, ui_tempChartSeries, y_value_for_chart);
+            }
+        }
+
+        // This counter is less critical now that historicalSamples always reflects the chart's state
+        // but can be useful for debugging or knowing when the array is "full" of attempts.
+        if (validSamplesCurrentlyStored < MAX_TEMP_SAMPLES) {
+            validSamplesCurrentlyStored++;
+        }
+        
+        // Important: Invalidate the chart to trigger a redraw, which will call our custom X-axis label drawer
+        if(ui_tempChart != NULL) {
+            lv_obj_invalidate(ui_tempChart);
+        }
+    }
 }
