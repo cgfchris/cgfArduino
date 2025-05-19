@@ -6,6 +6,7 @@
 #include "lv_conf.h" // Should be configured by SquareLine or your project
 #include "lvgl.h"
 #include "ui.h" // From SquareLine Studio
+#include <RPC.h>
 
 // Custom Modules
 #include "config.h"         // If you create one for SSID, etc.
@@ -20,8 +21,23 @@ Arduino_GigaDisplayTouch TouchDetector;
 
 void setup() {
     Serial.begin(115200);
-    //while (!Serial && millis() < 5000); // Optional: wait for serial connection
+    while (!Serial && millis() < 5000); // Optional: wait for serial connection
 
+    // Boot the M4 core.
+    Serial.println("M7: Core setup started.");
+    Serial.println("M7: Attempting to start RPC and boot M4...");
+
+    if (RPC.begin()) { // This will now attempt to start the M4 code you just flashed
+        Serial.println("M7: RPC.begin() successful. M4 should be booting/running its flashed code.");
+    } else {
+        Serial.println("M7: FATAL ERROR - RPC.begin() failed!");
+        // Potentially loop forever or indicate error clearly if this happens
+        // while(1) { delay(100); }
+    }
+
+    Serial.println("M7: M4 core should be booting now.");
+    delay(1000); // Give M4 some time to initialize
+    
     // --- Hardware and LVGL Initialization ---
     Display.begin();
     TouchDetector.begin();
