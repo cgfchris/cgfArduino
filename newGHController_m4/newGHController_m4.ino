@@ -279,30 +279,40 @@ void manageHeater(unsigned long currentTime) {
 
 // --- Shade Management ---
 void manageShade(unsigned long currentTime) {
-  if (shadeOpenRelayActive || shadeCloseRelayActive) return;
+  if (shadeOpenRelayActive || shadeCloseRelayActive) return; // Don't interfere with active pulse
 
-  bool targetShadeState = shadeState;
-  if (!shadeState && currentHour == SHADE_OPEN_HOUR && currentMinute == 0) {
-      targetShadeState = true;
-  } else if (shadeState && currentHour == SHADE_CLOSE_HOUR && currentMinute == 0) {
-      targetShadeState = false;
+  bool desiredShadeStateBasedOnTime;
+
+  // Determine if the shade *should* be open based on the current time
+  if (currentHour >= SHADE_OPEN_HOUR && currentHour < SHADE_CLOSE_HOUR) {
+    // It's within the "open" window
+    desiredShadeStateBasedOnTime = true; // true means OPEN
+  } else {
+    // It's outside the "open" window (either before open time or after close time)
+    desiredShadeStateBasedOnTime = false; // false means CLOSED
   }
 
-  if (targetShadeState != shadeState) {
-    if (targetShadeState) {
-        RPC.println("M4: Shade: Target OPEN.");
+  // Now check if the current actual state matches the desired state
+  if (desiredShadeStateBasedOnTime != shadeState) {
+    // State needs to change
+    if (desiredShadeStateBasedOnTime) { // Need to OPEN
+        RPC.println("M4: Shade: Current time (" + String(currentHour) + ":" + String(currentMinute) +
+                      ") requires shade to be OPEN. Current state: CLOSED. Opening...");
         setRelay(SHADE_OPEN_RELAY_PIN, true);
         shadeOpenRelayActive = true;
         shadeOpenRelayStopTime = currentTime + SHADE_PULSE_DURATION_MS;
-    } else {
-        RPC.println("M4: Shade: Target CLOSE.");
+        shadeState = true; // Update current state assuming it will open
+    } else { // Need to CLOSE
+        RPC.println("M4: Shade: Current time (" + String(currentHour) + ":" + String(currentMinute) +
+                      ") requires shade to be CLOSED. Current state: OPEN. Closing...");
         setRelay(SHADE_CLOSE_RELAY_PIN, true);
         shadeCloseRelayActive = true;
         shadeCloseRelayStopTime = currentTime + SHADE_PULSE_DURATION_MS;
+        shadeState = false; // Update current state assuming it will close
     }
-    shadeState = targetShadeState;
-    lastShadeRefreshTime = currentTime;
+    lastShadeRefreshTime = currentTime; // Reset refresh timer as we just initiated a move
   }
+  // No 'else' needed here, if desiredShadeStateBasedOnTime == shadeState, do nothing.
 }
 
 // --- Handle Refresh Pulses ---
