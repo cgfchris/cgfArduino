@@ -46,7 +46,7 @@ void initialize_ntp() {
             lastNtpAttemptTimeMillis = millis(); // Still set to allow retry logic to kick in
         }
     } else {
-        Serial.println("NTP: WiFi not connected. Skipping initial sync.");
+        Serial.println("NTP: WiFi not connected at init. Skipping initial sync.");
         if (ui_time) lv_label_set_text(ui_time, "--:--:--");
         if (ui_date) lv_label_set_text(ui_date, "No NTP Sync");
         lastNtpAttemptTimeMillis = millis(); // Set to allow retry logic
