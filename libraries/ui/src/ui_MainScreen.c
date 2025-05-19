@@ -80,22 +80,49 @@ void ui_MainScreen_screen_init(void)
     lv_label_set_text(ui_time, "18:45:00");
     lv_obj_set_style_text_font(ui_time, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);
 
-    ui_statusLabel = lv_label_create(ui_MainScreen);
-    lv_obj_set_width(ui_statusLabel, LV_SIZE_CONTENT);   /// 1
-    lv_obj_set_height(ui_statusLabel, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_statusLabel, 0);
-    lv_obj_set_y(ui_statusLabel, -51);
-    lv_obj_set_align(ui_statusLabel, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_statusLabel, "status	");
-    lv_obj_set_style_text_font(ui_statusLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+    ui_ventStatusLabel = lv_label_create(ui_MainScreen);
+    lv_obj_set_width(ui_ventStatusLabel, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_ventStatusLabel, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_ventStatusLabel, 0);
+    lv_obj_set_y(ui_ventStatusLabel, -10);
+    lv_obj_set_align(ui_ventStatusLabel, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_ventStatusLabel, "status	");
+    lv_obj_set_style_text_font(ui_ventStatusLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
     ui_wifiStatusLabel = lv_label_create(ui_MainScreen);
     lv_obj_set_width(ui_wifiStatusLabel, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_wifiStatusLabel, LV_SIZE_CONTENT);    /// 1
     lv_obj_set_x(ui_wifiStatusLabel, 0);
-    lv_obj_set_y(ui_wifiStatusLabel, -11);
+    lv_obj_set_y(ui_wifiStatusLabel, -50);
     lv_obj_set_align(ui_wifiStatusLabel, LV_ALIGN_CENTER);
     lv_label_set_text(ui_wifiStatusLabel, "status	");
     lv_obj_set_style_text_font(ui_wifiStatusLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    ui_heaterStatusLabel = lv_label_create(ui_MainScreen);
+    lv_obj_set_width(ui_heaterStatusLabel, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_heaterStatusLabel, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_heaterStatusLabel, 0);
+    lv_obj_set_y(ui_heaterStatusLabel, 30);
+    lv_obj_set_align(ui_heaterStatusLabel, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_heaterStatusLabel, "status	");
+    lv_obj_set_style_text_font(ui_heaterStatusLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    ui_shadeStatusLabel = lv_label_create(ui_MainScreen);
+    lv_obj_set_width(ui_shadeStatusLabel, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_shadeStatusLabel, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_shadeStatusLabel, 0);
+    lv_obj_set_y(ui_shadeStatusLabel, 70);
+    lv_obj_set_align(ui_shadeStatusLabel, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_shadeStatusLabel, "status	");
+    lv_obj_set_style_text_font(ui_shadeStatusLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+
+    ui_boostStatusLabel = lv_label_create(ui_MainScreen);
+    lv_obj_set_width(ui_boostStatusLabel, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_boostStatusLabel, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_boostStatusLabel, 0);
+    lv_obj_set_y(ui_boostStatusLabel, 110);
+    lv_obj_set_align(ui_boostStatusLabel, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_boostStatusLabel, "status	");
+    lv_obj_set_style_text_font(ui_boostStatusLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
 }

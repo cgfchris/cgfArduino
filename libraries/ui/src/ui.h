@@ -35,8 +35,11 @@ extern lv_obj_t * ui_tempLabel;
 extern lv_obj_t * ui_tempChart;
 extern lv_obj_t * ui_date;
 extern lv_obj_t * ui_time;
-extern lv_obj_t * ui_statusLabel;
+extern lv_obj_t * ui_ventStatusLabel;
 extern lv_obj_t * ui_wifiStatusLabel;
+extern lv_obj_t * ui_heaterStatusLabel;
+extern lv_obj_t * ui_shadeStatusLabel;
+extern lv_obj_t * ui_boostStatusLabel;
 // CUSTOM VARIABLES
 
 // EVENTS

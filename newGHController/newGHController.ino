@@ -22,8 +22,6 @@ int m4_vent_stage = -1;
 bool m4_heater_state = false;
 bool m4_shade_state = false;
 bool m4_boost_state = false;
-char tempLabelBufferMain[10];
-char statusLabelBufferMain[50];
 
 void setup() {
     Serial.begin(115200);
@@ -75,88 +73,94 @@ void setup() {
 }
 
 // exchangeDataWithM4AndRefreshUI() - using the simplified try-catch version
-void exchangeDataWithM4AndRefreshUI() {
-    //Serial.println("DEBUG: M7: exchangeDataWithM4AndRefreshUI() called."); // Can be very noisy
+char tempLabelBufferMain[10]; // Already declared
+char ventStatusBuffer[20];
+char heaterStatusBuffer[15];
+char shadeStatusBuffer[15];
+char boostStatusBuffer[15];
 
+void exchangeDataWithM4AndRefreshUI() {
+    // 1. Send Current Time to M4 (if NTP is synced) - (No change to this part)
     if (is_ntp_synced()) {
         int current_hour = get_current_hour();
         int current_minute = get_current_minute();
-        if (current_hour != -1) {
+        if (current_hour != -1) { // Valid time
             RPC.call("receiveTimeFromM7", current_hour, current_minute);
         }
     }
 
+    // 2. Get Data from M4 and Update Individual UI Labels
+
+    // ** GET & UPDATE M4 TEMPERATURE **
     float temp_from_m4_val = NAN;
     try {
         auto temp_handle = RPC.call("getM4Temperature");
         temp_from_m4_val = temp_handle.as<float>();
         m4_reported_temperature = temp_from_m4_val;
     } catch (const std::exception& e) {
-        Serial.print("M7 [EXC_M4_TEMP]: "); Serial.println(e.what()); // More specific debug
         m4_reported_temperature = NAN;
     }
     updateCurrentTemperatureFromM4(m4_reported_temperature);
-    Serial.print("DEBUG: M7: M4 Temp for UI: ");
-    if (isnan(m4_reported_temperature)) Serial.println("NAN"); else Serial.println(m4_reported_temperature);
-    
-    if (ui_tempLabel != NULL) { // Check if UI object exists
+    if (ui_tempLabel) { // Simplified check
         if (!isnan(m4_reported_temperature)) {
             snprintf(tempLabelBufferMain, sizeof(tempLabelBufferMain), "%.1fC", m4_reported_temperature);
-            Serial.print("DEBUG: M7: Setting ui_tempLabel text to: "); Serial.println(tempLabelBufferMain); // Add this
             lv_label_set_text(ui_tempLabel, tempLabelBufferMain);
         } else {
-            Serial.println("DEBUG: M7: Setting ui_tempLabel text to ---C"); // Add this
             lv_label_set_text(ui_tempLabel, "---C");
         }
-    } else {
-        Serial.println("DEBUG: M7: ERROR - ui_tempLabel is NULL!"); // Add this
     }
 
+    // ** GET & UPDATE M4 VENT STAGE **
     int vent_stage_val = -1;
     try {
         auto vent_handle = RPC.call("getM4VentStage");
         vent_stage_val = vent_handle.as<int>();
         m4_vent_stage = vent_stage_val;
-    } catch (const std::exception& e) { Serial.print("M7 [EXC_M4_VENT]: "); Serial.println(e.what()); m4_vent_stage = -1; }
+    } catch (const std::exception& e) { m4_vent_stage = -1; }
 
-    bool heater_state_val = m4_heater_state; // Default to previous
+    if (ui_ventStatusLabel) { // Simplified check
+        if (m4_vent_stage == 0) snprintf(ventStatusBuffer, sizeof(ventStatusBuffer), "Vents: Closed");
+        else if (m4_vent_stage == 1) snprintf(ventStatusBuffer, sizeof(ventStatusBuffer), "Vents: 25%%");
+        else if (m4_vent_stage == 2) snprintf(ventStatusBuffer, sizeof(ventStatusBuffer), "Vents: 50%%");
+        else if (m4_vent_stage == 3) snprintf(ventStatusBuffer, sizeof(ventStatusBuffer), "Vents: 100%%");
+        else snprintf(ventStatusBuffer, sizeof(ventStatusBuffer), "Vents: N/A");
+        lv_label_set_text(ui_ventStatusLabel, ventStatusBuffer);
+    }
+
+    // ** GET & UPDATE M4 HEATER STATE **
     try {
         auto heater_handle = RPC.call("getM4HeaterState");
-        heater_state_val = heater_handle.as<bool>();
-        m4_heater_state = heater_state_val;
-    } catch (const std::exception& e) { Serial.print("M7 [EXC_M4_HEAT]: "); Serial.println(e.what()); }
+        m4_heater_state = heater_handle.as<bool>();
+    } catch (const std::exception& e) { /* m4_heater_state retains previous on error */ }
 
-    bool shade_state_val = m4_shade_state; // Default to previous
+    if (ui_heaterStatusLabel) { // Simplified check
+        snprintf(heaterStatusBuffer, sizeof(heaterStatusBuffer), "Heater: %s", m4_heater_state ? "ON" : "OFF");
+        lv_label_set_text(ui_heaterStatusLabel, heaterStatusBuffer);
+    }
+
+    // ** GET & UPDATE M4 SHADE STATE **
     try {
         auto shade_handle = RPC.call("getM4ShadeState");
-        shade_state_val = shade_handle.as<bool>();
-        m4_shade_state = shade_state_val;
-    } catch (const std::exception& e) { Serial.print("M7 [EXC_M4_SHADE]: "); Serial.println(e.what()); }
+        m4_shade_state = shade_handle.as<bool>();
+    } catch (const std::exception& e) { /* m4_shade_state retains previous on error */ }
 
-    bool boost_state_val = m4_boost_state; // Default to previous
+    if (ui_shadeStatusLabel) { // Simplified check
+        snprintf(shadeStatusBuffer, sizeof(shadeStatusBuffer), "Shade: %s", m4_shade_state ? "Open" : "Closed");
+        lv_label_set_text(ui_shadeStatusLabel, shadeStatusBuffer);
+    }
+
+    // ** GET & UPDATE M4 BOOST STATE **
     try {
         auto boost_handle = RPC.call("getM4BoostState");
-        boost_state_val = boost_handle.as<bool>();
-        m4_boost_state = boost_state_val;
-    } catch (const std::exception& e) { Serial.print("M7 [EXC_M4_BOOST]: "); Serial.println(e.what()); }
+        m4_boost_state = boost_handle.as<bool>();
+    } catch (const std::exception& e) { /* m4_boost_state retains previous on error */ }
 
-    if (ui_statusLabel) {
-        String v_str = "V:?";
-        if(m4_vent_stage != -1){
-            if (m4_vent_stage == 0) v_str = "V:C";
-            else if (m4_vent_stage == 1) v_str = "V:25%";
-            else if (m4_vent_stage == 2) v_str = "V:50%";
-            else if (m4_vent_stage == 3) v_str = "V:100%";
-        }
-        snprintf(statusLabelBufferMain, sizeof(statusLabelBufferMain),
-                 "%s H:%s S:%s B:%s",
-                 v_str.c_str(),
-                 m4_heater_state ? "ON" : "OFF",
-                 m4_shade_state ? "Open" : "Closed",
-                 m4_boost_state ? "ON" : "OFF");
-        lv_label_set_text(ui_statusLabel, statusLabelBufferMain);
+    if (ui_boostStatusLabel) { // Simplified check
+        snprintf(boostStatusBuffer, sizeof(boostStatusBuffer), "Boost: %s", m4_boost_state ? "Active" : "Off");
+        lv_label_set_text(ui_boostStatusLabel, boostStatusBuffer);
     }
 }
+
 
 unsigned long lastLoopHeartbeat = 0;
 

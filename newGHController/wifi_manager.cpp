@@ -32,7 +32,7 @@ void initialize_wifi() {
     currentWiFiState = WIFI_STATE_CONNECTING; // Start in connecting state
     if (ui_wifiStatusLabel) {
         lv_label_set_text(ui_wifiStatusLabel, "testing...");
-        //lv_timer_handler(); // Refresh label
+        lv_timer_handler(); // Refresh label
     }
     attempt_wifi_connection(); // Make the first connection attempt
 }
@@ -41,7 +41,7 @@ static void attempt_wifi_connection() {
     Serial.println("WiFi: Attempting to connect...");
     if (ui_wifiStatusLabel) {
         lv_label_set_text(ui_wifiStatusLabel, "WiFi Connecting...");
-        //lv_timer_handler(); // Refresh label
+        lv_timer_handler(); // Refresh label
     }
 
     WiFi.disconnect();  // Optional: ensure clean state before new attempt
@@ -61,10 +61,10 @@ static void attempt_wifi_connection() {
     if (millis() - connectionStartTime < WIFI_CONNECT_TIMEOUT_MS) { // Check if called from setup or manage
         Serial.print("WiFi: Initial connection attempt: ");
         snprintf(statusLabelBuffer, sizeof(statusLabelBuffer), "Connecting... %d", attemptCounter++);
-        if (ui_statusLabel) {
+        if (ui_wifiStatusLabel) {
            lv_label_set_text(ui_wifiStatusLabel, statusLabelBuffer);
         }
-        //lv_timer_handler(); // Keep LVGL responsive
+        lv_timer_handler(); // Keep LVGL responsive
         while (WiFi.status() != WL_CONNECTED && (millis() - connectionStartTime < WIFI_CONNECT_TIMEOUT_MS)) {
             delay(500);
             Serial.print(".");

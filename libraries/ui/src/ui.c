@@ -18,8 +18,11 @@ lv_obj_t * ui_tempLabel;
 lv_obj_t * ui_tempChart;
 lv_obj_t * ui_date;
 lv_obj_t * ui_time;
-lv_obj_t * ui_statusLabel;
+lv_obj_t * ui_ventStatusLabel;
 lv_obj_t * ui_wifiStatusLabel;
+lv_obj_t * ui_heaterStatusLabel;
+lv_obj_t * ui_shadeStatusLabel;
+lv_obj_t * ui_boostStatusLabel;
 // CUSTOM VARIABLES
 
 // EVENTS
