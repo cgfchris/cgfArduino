@@ -2,7 +2,7 @@
 #include "wifi_manager.h"
 #include "config.h"
 #include "lvgl.h"
-#include "ui.h"     // For ui_wifiStatusLable
+#include "ui.h"     // For ui_wifiStatusLabel
 #include <stdio.h>  // For snprintf
 
 // WiFi credentials and status
@@ -12,8 +12,25 @@ int wifi_status = WL_IDLE_STATUS;
 char statusLabelBuffer[WIFI_STATUS_LABEL_BUFFER_SIZE];
 
 void initialize_wifi() {
+<<<<<<< HEAD
     if (ui_statusLabel) { // Check if ui_statusLabel is valid
         lv_label_set_text(ui_statusLabel, "WiFi Connecting...");
+=======
+    Serial.println("WiFi: Initializing...");
+    currentWiFiState = WIFI_STATE_CONNECTING; // Start in connecting state
+    if (ui_wifiStatusLabel) {
+        lv_label_set_text(ui_wifiStatusLabel, "testing...");
+        //lv_timer_handler(); // Refresh label
+    }
+    attempt_wifi_connection(); // Make the first connection attempt
+}
+
+static void attempt_wifi_connection() {
+    Serial.println("WiFi: Attempting to connect...");
+    if (ui_wifiStatusLabel) {
+        lv_label_set_text(ui_wifiStatusLabel, "WiFi Connecting...");
+        //lv_timer_handler(); // Refresh label
+>>>>>>> d796cc3 (This seems to now be working??)
     }
     Serial.println("Attempting to connect to WiFi...");
 
@@ -37,7 +54,7 @@ void initialize_wifi() {
         if (ui_statusLabel) {
            lv_label_set_text(ui_wifiStatusLabel, statusLabelBuffer);
         }
-        lv_timer_handler(); // Keep LVGL responsive
+        //lv_timer_handler(); // Keep LVGL responsive
         while (WiFi.status() != WL_CONNECTED && (millis() - connectionStartTime < WIFI_CONNECT_TIMEOUT_MS)) {
             delay(500);
             Serial.print(".");
@@ -56,7 +73,7 @@ void initialize_wifi() {
         Serial.print("IP Address: ");
         Serial.println(WiFi.localIP());
         if (ui_wifiStatusLabel) {
-            lv_label_set_text(ui_wifiStatusLable, "WiFi Connected");
+            lv_label_set_text(ui_wifiStatusLabel, "WiFi Connected");
             lv_timer_handler();
         }
         print_wifi_status();
@@ -64,8 +81,8 @@ void initialize_wifi() {
         // If still not connected after initial attempt (e.g. from setup)
         currentWiFiState = WIFI_STATE_DISCONNECTED; // Or CONNECTION_LOST if it was previously connected
         Serial.println("WiFi: Initial connection failed.");
-        if (ui_wifiStatusLable) {
-            lv_label_set_text(ui_wifiStatusLable, "WiFi Failed");
+        if (ui_wifiStatusLabel) {
+            lv_label_set_text(ui_wifiStatusLabel, "WiFi Failed");
             lv_timer_handler();
         }
     }
@@ -86,8 +103,8 @@ void print_wifi_status() {
                 Serial.println("WiFi: Connection Lost!");
                 currentWiFiState = WIFI_STATE_CONNECTION_LOST;
                 lastWifiConnectAttemptMillis = millis(); // Set for immediate retry attempt logic
-                if (ui_wifiStatusLable) {
-                    lv_label_set_text(ui_wifiStatusLable, "WiFi Lost!");
+                if (ui_wifiStatusLabel) {
+                    lv_label_set_text(ui_wifiStatusLabel, "WiFi Lost!");
                     lv_timer_handler();
                 }
                 // No immediate retry here, wait for the interval in DISCONNECTED/CONNECTION_LOST
@@ -100,16 +117,16 @@ void print_wifi_status() {
                 Serial.println("WiFi: Reconnected!");
                 Serial.print("IP Address: ");
                 Serial.println(WiFi.localIP());
-                if (ui_wifiStatusLable) {
-                    lv_label_set_text(ui_wifiStatusLable, "WiFi Reconnected");
+                if (ui_wifiStatusLabel) {
+                    lv_label_set_text(ui_wifiStatusLabel, "WiFi Reconnected");
                     lv_timer_handler();
                 }
                 print_wifi_status();
             } else if (millis() - lastWifiConnectAttemptMillis > WIFI_CONNECT_TIMEOUT_MS) {
                 Serial.println("WiFi: Connection attempt timed out.");
                 currentWiFiState = WIFI_STATE_DISCONNECTED; // Go to disconnected, will retry on interval
-                if (ui_wifiStatusLable) {
-                    lv_label_set_text(ui_wifiStatusLable, "WiFi Timeout");
+                if (ui_wifiStatusLabel) {
+                    lv_label_set_text(ui_wifiStatusLabel, "WiFi Timeout");
                     lv_timer_handler();
                 }
                 // WiFi.disconnect();  // Optionally force disconnect
@@ -120,8 +137,8 @@ void print_wifi_status() {
         case WIFI_STATE_CONNECTION_LOST:
             if (millis() - lastWifiConnectAttemptMillis > WIFI_RECONNECT_INTERVAL_MS) {
                 Serial.println("WiFi: Attempting to reconnect...");
-                if (ui_wifiStatusLable) {
-                    lv_label_set_text(ui_wifiStatusLable, "WiFi Reconnecting...");
+                if (ui_wifiStatusLabel) {
+                    lv_label_set_text(ui_wifiStatusLabel, "WiFi Reconnecting...");
                     lv_timer_handler();
                 }
                 // Update last attempt time *before* starting the connection attempt
