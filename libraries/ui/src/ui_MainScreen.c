@@ -89,4 +89,13 @@ void ui_MainScreen_screen_init(void)
     lv_label_set_text(ui_statusLabel, "status	");
     lv_obj_set_style_text_font(ui_statusLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
 
+    ui_wifiStatusLabel = lv_label_create(ui_MainScreen);
+    lv_obj_set_width(ui_wifiStatusLabel, LV_SIZE_CONTENT);   /// 1
+    lv_obj_set_height(ui_wifiStatusLabel, LV_SIZE_CONTENT);    /// 1
+    lv_obj_set_x(ui_wifiStatusLabel, 0);
+    lv_obj_set_y(ui_wifiStatusLabel, -11);
+    lv_obj_set_align(ui_wifiStatusLabel, LV_ALIGN_CENTER);
+    lv_label_set_text(ui_wifiStatusLabel, "status	");
+    lv_obj_set_style_text_font(ui_wifiStatusLabel, &lv_font_montserrat_26, LV_PART_MAIN | LV_STATE_DEFAULT);
+
 }

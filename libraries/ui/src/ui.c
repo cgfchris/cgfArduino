@@ -19,6 +19,7 @@ lv_obj_t * ui_tempChart;
 lv_obj_t * ui_date;
 lv_obj_t * ui_time;
 lv_obj_t * ui_statusLabel;
+lv_obj_t * ui_wifiStatusLabel;
 // CUSTOM VARIABLES
 
 // EVENTS

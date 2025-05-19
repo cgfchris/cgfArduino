@@ -36,6 +36,7 @@ extern lv_obj_t * ui_tempChart;
 extern lv_obj_t * ui_date;
 extern lv_obj_t * ui_time;
 extern lv_obj_t * ui_statusLabel;
+extern lv_obj_t * ui_wifiStatusLabel;
 // CUSTOM VARIABLES
 
 // EVENTS

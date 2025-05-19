@@ -1,192 +1,186 @@
 // temperature_system.cpp
-#include "temperature_system.h"
-#include "config.h"
-#include "ui.h"           // For ui_tempLabel, ui_tempChart (from SquareLine)
-#include <stdio.h>        // For snprintf
-#include <math.h>         // For isnan, round, NAN
-#include <time.h>         // For time_t, struct tm, strftime, time()
-#include <mbed_mktime.h>  // For _rtc_localtime on Portenta/Giga
+#include <Arduino.h>             // For Serial, isnan, round, etc.
+#include "temperature_system.h"  // Corresponding header
+#include "ntp_time.h"
+#include "config.h"              // For constants like CHART_Y_MIN_VALUE, etc.
+#include "ui.h"                  // For ui_tempChart (LVGL chart object from SquareLine)
+#include <stdio.h>               // For snprintf (if not covered by Arduino.h for all targets)
+#include <math.h>                // For isnan, round (often part of Arduino.h via C++ headers)
+#include <time.h>                // For time_t, struct tm, strftime
+#include <mbed_mktime.h>         // For _rtc_localtime on Giga/Portenta
 
 // --- Global Variables for this module ---
-lv_chart_series_t *ui_tempChartSeries = NULL;
-float currentTemperature = NAN;
-TempSampleData historicalSamples[MAX_TEMP_SAMPLES];
-int validSamplesCurrentlyStored = 0; // Can be removed if not strictly needed
+lv_chart_series_t *ui_tempChartSeries = NULL; // LVGL Chart series pointer
+float currentTemperature_local = NAN;         // This module's copy of temperature, updated from M4 via new function
+TempSampleData historicalSamples[MAX_TEMP_SAMPLES]; // Array to store historical temp data for the chart
 
-unsigned long lastTempReadTime = 0;
-unsigned long lastSampleTime = 0;
-char tempLabelBuffer[32];
+unsigned long lastSampleTime = 0;             // To track when to take the next sample for the chart
 
-
-// --- Placeholder Sensor Function ---
-// !! REPLACE THIS with your actual sensor reading code !!
-float readTemperatureSensor() {
-    // --- Example Simulation (Remove this block) ---
-    static float simulatedTempBase = 22.0;
-    int change = rand() % 3 - 1;
-    simulatedTempBase += (float)change * 0.5f;
-    if (simulatedTempBase < CHART_Y_MIN_VALUE + 2) simulatedTempBase = CHART_Y_MIN_VALUE + 2;
-    if (simulatedTempBase > CHART_Y_MAX_VALUE - 2) simulatedTempBase = CHART_Y_MAX_VALUE - 2;
-    // return simulatedTempBase + (rand() % 100) / 150.0f;
-    // For testing NAN
-    // if ((rand() % 10) == 0) return NAN; 
-    return 20.0 + (rand() % 100) / 20.0; // Simpler range for testing
-    // --- End Simulation ---
+// --- Sensor Function (NO LONGER THE PRIMARY SOURCE FOR UI DISPLAY) ---
+// This function is effectively unused if M4 provides the temperature.
+// Kept for structure if M7 ever needs its own independent temperature reading.
+float readM7OwnTemperatureSensor_placeholder() {
+    // If M7 had its own sensor for some other purpose, its reading logic would be here.
+    // Returning a dummy value.
+    return 21.5f;
 }
 
-// --- Custom Draw Event for Chart X-Axis Tick Labels ---
+// --- Custom Draw Event for Chart X-Axis Tick Labels (From your original code) ---
 static void chart_x_axis_draw_event_cb(lv_event_t * e) {
     lv_obj_draw_part_dsc_t * dsc = lv_event_get_draw_part_dsc(e);
 
+    // Check if it's the X-axis primary ticks and text is being drawn
     if (dsc->part == LV_PART_TICKS && dsc->id == LV_CHART_AXIS_PRIMARY_X && dsc->text != NULL) {
-        int chart_point_index = dsc->value;
+        int chart_point_index = dsc->value; // Index of the point for which tick is drawn
 
+        // Ensure the index is valid and we have a valid timestamp for it
         if (chart_point_index >= 0 && chart_point_index < MAX_TEMP_SAMPLES &&
             historicalSamples[chart_point_index].isValidTimestamp) {
+            
             time_t sample_ts = historicalSamples[chart_point_index].timestamp;
             struct tm timeinfo;
             
-            // Apply timezone for display if timestamps are UTC
+            // Apply timezone for display if timestamps are stored as UTC
+            // NTP_TIMEZONE should be defined in config.h or ntp_time.h
             time_t display_ts = sample_ts + (3600L * NTP_TIMEZONE);
             _rtc_localtime(display_ts, &timeinfo, RTC_FULL_LEAP_YEAR_SUPPORT);
 
-            char time_str_buffer[6]; // "HH:MM\0"
+            char time_str_buffer[6]; // Buffer for "HH:MM\0"
             strftime(time_str_buffer, sizeof(time_str_buffer), "%H:%M", &timeinfo);
             lv_snprintf(dsc->text, dsc->text_length, "%s", time_str_buffer);
         } else {
+            // If no valid timestamp, display a placeholder
             lv_snprintf(dsc->text, dsc->text_length, "-:-");
         }
     }
 }
 
+// --- Function to update this module's temperature based on data from M4 ---
+// This function is called by the main M7 .ino file after fetching temperature from M4.
+void updateCurrentTemperatureFromM4(float m4_temp) {
+    if (!isnan(m4_temp)) {
+        currentTemperature_local = m4_temp;
+    } else {
+        currentTemperature_local = NAN; // Propagate NAN if M4 sends it or RPC fails
+    }
+    // For debugging:
+    // Serial.print("M7-TempSys: Internal temperature updated to: ");
+    // if(isnan(currentTemperature_local)) Serial.println("NAN"); else Serial.println(currentTemperature_local);
+}
 
 void initializeTemperatureSystem() {
+    // Initialize historical samples array
     for (int i = 0; i < MAX_TEMP_SAMPLES; i++) {
         historicalSamples[i].temperature = NAN;
         historicalSamples[i].timestamp = 0;
         historicalSamples[i].isValidTimestamp = false;
     }
-    validSamplesCurrentlyStored = 0;
 
+    // Initialize the LVGL chart (ui_tempChart should be created by ui_init())
     if (ui_tempChart != NULL) {
         lv_chart_set_type(ui_tempChart, LV_CHART_TYPE_LINE);
         lv_chart_set_update_mode(ui_tempChart, LV_CHART_UPDATE_MODE_SHIFT); // Data shifts left
         lv_chart_set_point_count(ui_tempChart, MAX_TEMP_SAMPLES);
+        // CHART_Y_MIN_VALUE and CHART_Y_MAX_VALUE should be in config.h or temperature_system.h
         lv_chart_set_range(ui_tempChart, LV_CHART_AXIS_PRIMARY_Y, CHART_Y_MIN_VALUE, CHART_Y_MAX_VALUE);
 
+        // Add a series to the chart
         ui_tempChartSeries = lv_chart_add_series(ui_tempChart, lv_palette_main(LV_PALETTE_BLUE), LV_CHART_AXIS_PRIMARY_Y);
         if (!ui_tempChartSeries) {
-            Serial.println("Error: Failed to add series to chart!");
-            return;
+            Serial.println("M7-TempSys: Error! Failed to add series to chart!");
+            return; // Critical error, chart won't work
         }
 
-        // Initialize chart points
+        // Initialize chart points to a baseline (e.g., min value)
         for (int i = 0; i < MAX_TEMP_SAMPLES; i++) {
             lv_chart_set_next_value(ui_tempChart, ui_tempChartSeries, CHART_Y_MIN_VALUE);
         }
-        // After filling with set_next_value for initialization in SHIFT mode,
-        // the "next" point is effectively the oldest. Subsequent set_next_value calls will replace it.
 
-        uint8_t num_x_major_ticks = 5;
+        // Configure X-axis ticks and labels (same as your original)
+        uint8_t num_x_major_ticks = 5; // Example: 5 major ticks
         lv_coord_t major_tick_len = 7;
         lv_coord_t minor_tick_len = 4;
-        uint8_t num_minor_ticks_between_major = (MAX_TEMP_SAMPLES / num_x_major_ticks) > 1 ? (MAX_TEMP_SAMPLES / num_x_major_ticks) / 2 -1 : 0; // Auto calc minor
+        // Auto calculate minor ticks, ensure denominator isn't zero
+        uint8_t num_minor_ticks_between_major = (MAX_TEMP_SAMPLES / num_x_major_ticks) > 1 ? (MAX_TEMP_SAMPLES / (num_x_major_ticks +1) ) / 2 -1 : 0;
+        num_minor_ticks_between_major = (num_minor_ticks_between_major > 0) ? num_minor_ticks_between_major : 0; // ensure non-negative
+
         bool draw_labels_for_major_ticks = true;
-        lv_coord_t extra_draw_space_for_labels = 25;
+        lv_coord_t extra_draw_space_for_labels = 25; // Space below X-axis for labels
 
         lv_chart_set_axis_tick(ui_tempChart, LV_CHART_AXIS_PRIMARY_X,
                        major_tick_len, minor_tick_len,
                        num_x_major_ticks, num_minor_ticks_between_major,
                        draw_labels_for_major_ticks, extra_draw_space_for_labels);
         
-        // Optional: Style X-axis tick labels
-        // lv_obj_set_style_text_font(ui_tempChart, &lv_font_montserrat_10, LV_PART_TICKS | LV_STATE_DEFAULT);
-        // lv_obj_set_style_text_color(ui_tempChart, lv_color_hex(0x808080), LV_PART_TICKS | LV_STATE_DEFAULT);
-
+        // Add event callback for drawing custom X-axis tick labels
         lv_obj_add_event_cb(ui_tempChart, chart_x_axis_draw_event_cb, LV_EVENT_DRAW_PART_BEGIN, NULL);
-        lv_obj_invalidate(ui_tempChart);
-        Serial.println("Temperature Chart Initialized.");
+        lv_obj_invalidate(ui_tempChart); // Force redraw after setup
+        Serial.println("M7-TempSys: Temperature Chart Initialized.");
     } else {
-        Serial.println("Error: ui_tempChart object not found!");
+        Serial.println("M7-TempSys: Error! ui_tempChart object (from ui.h) not found!");
     }
 
-    lastTempReadTime = millis();
-    lastSampleTime = millis();
+    lastSampleTime = millis(); // Initialize timer for chart sampling
 
-    currentTemperature = readTemperatureSensor();
-    if (ui_tempLabel != NULL) {
-        if (!isnan(currentTemperature)) {
-            snprintf(tempLabelBuffer, sizeof(tempLabelBuffer), "%.1f C", currentTemperature);
-            lv_label_set_text(ui_tempLabel, tempLabelBuffer);
-        } else {
-            lv_label_set_text(ui_tempLabel, "--.- C");
-        }
-    }
+    // currentTemperature_local will be updated by data from M4.
+    // The main ui_tempLabel (current temperature display) will be updated in the main .ino loop
+    // using data fetched directly from M4. This module (temperature_system) primarily manages the chart.
 }
 
-void updateTemperatureSystem() {
+void updateTemperatureSystem() { // This function now primarily updates the chart
     unsigned long currentTimeMs = millis();
 
-    if (currentTimeMs - lastTempReadTime >= TEMP_READ_INTERVAL_MS) {
-        lastTempReadTime = currentTimeMs;
-        float newTempReading = readTemperatureSensor();
+    // The main current temperature label (ui_tempLabel) is updated in the main .ino file.
+    // This function focuses on adding the current M4-sourced temperature to the chart history.
 
-        if (!isnan(newTempReading)) {
-            currentTemperature = newTempReading;
-            if (ui_tempLabel != NULL) {
-                snprintf(tempLabelBuffer, sizeof(tempLabelBuffer), "%.1f C", currentTemperature);
-                lv_label_set_text(ui_tempLabel, tempLabelBuffer);
-            }
-        } else {
-            if (ui_tempLabel != NULL) {
-                lv_label_set_text(ui_tempLabel, "Err C");
-            }
-            // Serial.println("Sensor read NAN for label."); // Can be noisy
-        }
-    }
-
+    // TEMP_SAMPLE_INTERVAL_MS should be defined in config.h or temperature_system.h
     if (currentTimeMs - lastSampleTime >= TEMP_SAMPLE_INTERVAL_MS) {
         lastSampleTime = currentTimeMs;
-        time_t currentEpochTimeUTC = time(NULL); // System RTC should be UTC
-        bool isTimeCurrentlyValid = (currentEpochTimeUTC > MIN_VALID_EPOCH_TIME);
+        // MIN_VALID_EPOCH_TIME should be defined in config.h or ntp_time.h
+        time_t currentEpochTimeUTC = time(NULL); // Get current system time (should be UTC if NTP sets UTC, or local if NTP sets local)
+                                                 // Our NTP module sets local time, so this is local.
+                                                 // For chart labels, if we want UTC based labels, we'd need to convert.
+                                                 // But chart_x_axis_draw_event_cb already assumes sample_ts is UTC and adds NTP_TIMEZONE for display.
+                                                 // So, historicalSamples[].timestamp should store UTC.
+                                                 // If time(NULL) returns local time here:
+        time_t currentEpochLocal = time(NULL);
+        currentEpochTimeUTC = currentEpochLocal - ( (long)NTP_TIMEZONE * 3600L ); // Convert local back to UTC for storage
 
-        // Shift historical samples
+        bool isTimeCurrentlyValid = (currentEpochTimeUTC > MIN_VALID_EPOCH_TIME) && is_ntp_synced(); // also check ntp_time.h's sync status
+
+        // Shift historical samples to make space for the new one
         for (int i = 0; i < MAX_TEMP_SAMPLES - 1; i++) {
             historicalSamples[i] = historicalSamples[i + 1];
         }
         int newestSampleIndex = MAX_TEMP_SAMPLES - 1;
 
-        if (!isnan(currentTemperature)) { // Use the last good reading for sampling
-            historicalSamples[newestSampleIndex].temperature = currentTemperature;
-            historicalSamples[newestSampleIndex].timestamp = currentEpochTimeUTC; // Store UTC
+        if (!isnan(currentTemperature_local)) { // Use the M4-sourced temperature
+            historicalSamples[newestSampleIndex].temperature = currentTemperature_local;
+            historicalSamples[newestSampleIndex].timestamp = currentEpochTimeUTC; // Store UTC timestamp
             historicalSamples[newestSampleIndex].isValidTimestamp = isTimeCurrentlyValid;
 
             if (ui_tempChart != NULL && ui_tempChartSeries != NULL) {
-                lv_coord_t chartValue = (lv_coord_t)round(currentTemperature);
-                // Ensure chartValue is within Y range, or LVGL might clip/behave unexpectedly
+                lv_coord_t chartValue = (lv_coord_t)round(currentTemperature_local);
+                // Ensure chartValue is within Y range
                 if (chartValue < CHART_Y_MIN_VALUE) chartValue = CHART_Y_MIN_VALUE;
                 if (chartValue > CHART_Y_MAX_VALUE) chartValue = CHART_Y_MAX_VALUE;
                 lv_chart_set_next_value(ui_tempChart, ui_tempChartSeries, chartValue);
             }
-             if(isTimeCurrentlyValid) {
-                Serial.print("Sampled: "); Serial.print(currentTemperature); Serial.println(" C");
-            } else {
-                Serial.print("Sampled (no valid time): "); Serial.print(currentTemperature); Serial.println(" C");
-            }
-        } else { // currentTemperature is NAN
+            // Serial.print("M7-TempSys: Chart Sampled: "); Serial.print(currentTemperature_local); Serial.println(" C");
+        } else { // currentTemperature_local from M4 is NAN
             historicalSamples[newestSampleIndex].temperature = NAN; // Store NAN
             historicalSamples[newestSampleIndex].timestamp = currentEpochTimeUTC;
-            historicalSamples[newestSampleIndex].isValidTimestamp = false; // Mark as invalid sample point for chart label
+            historicalSamples[newestSampleIndex].isValidTimestamp = false; // Mark as invalid sample point
 
             if (ui_tempChart != NULL && ui_tempChartSeries != NULL) {
-                // Plot NAN as min value on chart, or some other indicator
+                // Plot NAN as min value on chart, or some other indicator for missing data
                 lv_chart_set_next_value(ui_tempChart, ui_tempChartSeries, CHART_Y_MIN_VALUE);
             }
-            Serial.println("Skipped sample: currentTemperature is NAN.");
+            // Serial.println("M7-TempSys: Skipped chart sample: currentTemperature_local (from M4) is NAN.");
         }
 
         if (ui_tempChart != NULL) {
-            lv_obj_invalidate(ui_tempChart); // Trigger redraw for new point and labels
+            lv_obj_invalidate(ui_tempChart); // Trigger redraw for new point and X-axis labels
         }
     }
 }
