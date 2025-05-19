@@ -5,10 +5,16 @@
 #include "Arduino_GigaDisplayTouch.h"
 #include "lvgl.h"
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 #include "ui.h" // From SquareLine Studio
 
 // Custom Modules
 #include "config.h"         // If you create one for SSID, etc.
+=======
+#include "ui.h"
+#include <RPC.h>
+#include "config.h"
+>>>>>>> Stashed changes
 =======
 #include "ui.h"
 #include <RPC.h>
@@ -36,6 +42,7 @@ char statusLabelBufferMain[50];
 void setup() {
     Serial.begin(115200);
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
     //while (!Serial && millis() < 5000); // Optional: wait for serial connection
 
 =======
@@ -45,6 +52,14 @@ void setup() {
 
     Serial.println("\n\n\nDEBUG: M7: Setup Phase 0 - Serial Initialized."); delay(100);
 
+=======
+    unsigned long setupStartTime = millis();
+    // Make this wait very short for initial debugging. If Serial never connects, we want to proceed.
+    while (!Serial && (millis() - setupStartTime < 1000)); // Shortened wait
+
+    Serial.println("\n\n\nDEBUG: M7: Setup Phase 0 - Serial Initialized."); delay(100);
+
+>>>>>>> Stashed changes
     Serial.println("DEBUG: M7: Setup Phase 1 - Initializing RPC and booting M4..."); delay(100);
     if (RPC.begin()) {
         Serial.println("DEBUG: M7: RPC.begin() successful. M4 should be running."); delay(100);
@@ -56,6 +71,9 @@ void setup() {
     delay(2000); // Give M4 time.
     Serial.println("DEBUG: M7: M4 init delay complete."); delay(100);
 
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
     // --- Hardware and LVGL Initialization ---
     Serial.println("DEBUG: M7: Setup Phase 2 - Display.begin()..."); delay(100);
