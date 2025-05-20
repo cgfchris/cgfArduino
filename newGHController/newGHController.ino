@@ -61,7 +61,7 @@ void setup() {
     Serial.println("DEBUG: M7: initialize_wifi() DONE."); delay(100);
 
     Serial.println("DEBUG: M7: Setup Phase 7 - initialize_ntp()..."); delay(100);
-    initialize_ntp(); // From ntp_time.h
+    initialize_ntp_and_rtc(); //  From ntp_time.h
     Serial.println("DEBUG: M7: initialize_ntp() DONE."); delay(100);
 
     Serial.println("DEBUG: M7: Setup Phase 8 - initializeTemperatureSystem()..."); delay(100);
@@ -81,7 +81,7 @@ char boostStatusBuffer[15];
 
 void exchangeDataWithM4AndRefreshUI() {
     // 1. Send Current Time to M4 (if NTP is synced) - (No change to this part)
-    if (is_ntp_synced()) {
+    if (is_time_valid()) {
         int current_hour = get_current_hour();
         int current_minute = get_current_minute();
         if (current_hour != -1) { // Valid time
@@ -176,11 +176,11 @@ void loop() {
 
     manage_wifi_connection();
 
-    if (is_wifi_connected()) {
-        update_ntp_time_display();
-    } else {
+    if (!is_time_valid()) {
         if (ui_time) lv_label_set_text(ui_time, "--:--:--");
-        if (ui_date) lv_label_set_text(ui_date, "No WiFi");
+        if (ui_date) lv_label_set_text(ui_date, "No Time");
+    } else {
+        update_time_management(); // Update from RTC
     }
 
     if (currentTimeMs - lastM4DataExchangeTime >= M4_DATA_EXCHANGE_INTERVAL_MS) {

@@ -146,7 +146,7 @@ void updateTemperatureSystem() { // This function now primarily updates the char
         time_t currentEpochLocal = time(NULL);
         currentEpochTimeUTC = currentEpochLocal - ( (long)NTP_TIMEZONE * 3600L ); // Convert local back to UTC for storage
 
-        bool isTimeCurrentlyValid = (currentEpochTimeUTC > MIN_VALID_EPOCH_TIME) && is_ntp_synced(); // also check ntp_time.h's sync status
+        bool isTimeCurrentlyValid = (currentEpochTimeUTC > MIN_VALID_EPOCH_TIME) && is_time_valid(); // also check ntp_time.h's sync status
 
         // Shift historical samples to make space for the new one
         for (int i = 0; i < MAX_TEMP_SAMPLES - 1; i++) {
