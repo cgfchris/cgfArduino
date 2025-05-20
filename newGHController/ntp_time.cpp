@@ -2,11 +2,13 @@
 #include "ntp_time.h"
 #include "config.h"
 #include "wifi_manager.h"
+
 #include <WiFi.h>
 #include <WiFiUdp.h>
 #include <time.h>
 #include <mbed_mktime.h>
 #include "lvgl.h"
+
 #include "ui.h"
 #include <Arduino.h>
 #include <Wire.h>       // <<<< ADD FOR I2C
@@ -79,6 +81,7 @@ void initialize_ntp_and_rtc() {
         if (!timeHasBeenSet && ui_date) lv_label_set_text(ui_date, "No Time Source");
     }
     printTimeNowMillis = millis() - NTP_PRINT_INTERVAL_MS - 1;
+
 }
 
 void send_ntp_packet(const char* address) {
@@ -107,10 +110,12 @@ void parse_ntp_response() {
         Serial.println("NTP: Received undersized packet. Sync failed.");
         return;
     }
+
     unsigned long highWord = word(ntpPacketBuffer[40], ntpPacketBuffer[41]);
     unsigned long lowWord = word(ntpPacketBuffer[42], ntpPacketBuffer[43]);
     unsigned long secsSince1900 = highWord << 16 | lowWord;
     if (secsSince1900 == 0) {
+
         Serial.println("NTP: Invalid timestamp (all zeros). Sync failed.");
         return;
     }
@@ -123,6 +128,7 @@ void parse_ntp_response() {
     timeHasBeenSet = true;
     Serial.print("NTP: System time synchronized. RTC set to local epoch: "); Serial.println(local_epoch);
 
+
     // Also update the hardware RTC with this new UTC time
     if (rtc.begin()) { // Ensure RTC is still accessible
         rtc.adjust(DateTime(utc_epoch)); // RTClib DateTime constructor from unixtime assumes UTC
@@ -133,6 +139,7 @@ void parse_ntp_response() {
 }
 
 void get_formatted_local_time(char* buffer, size_t buffer_size) {
+
     if (!is_time_valid()) { // Use the new generic time validity check
         snprintf(buffer, buffer_size, "--:--:--");
         return;
@@ -149,6 +156,7 @@ void get_formatted_local_date(char* buffer, size_t buffer_size) {
         return;
     }
     time_t now = time(NULL);
+
     struct tm timeinfo;
     _rtc_localtime(now, &timeinfo, RTC_FULL_LEAP_YEAR_SUPPORT);
     strftime(buffer, buffer_size, "%b %d, %Y", &timeinfo);
@@ -159,12 +167,15 @@ void update_time_management() { // Renamed function
     if (millis() - printTimeNowMillis >= NTP_PRINT_INTERVAL_MS) {
         char timeString[12];
         char dateString[20];
+
         get_formatted_local_time(timeString, sizeof(timeString));
         get_formatted_local_date(dateString, sizeof(dateString));
+
         if (ui_time) lv_label_set_text(ui_time, timeString);
         if (ui_date) lv_label_set_text(ui_date, dateString);
         printTimeNowMillis = millis();
     }
+
 
     // Determine NTP sync interval
     unsigned long current_ntp_sync_interval;
@@ -209,6 +220,7 @@ void update_time_management() { // Renamed function
             // so it will try more frequently once WiFi is back, using NTP_RETRY_INTERVAL_MS
             // if timeHasBeenSet is still false.
             // Serial.println("TimeKeeper: WiFi not connected for NTP sync attempt.");
+
         }
     }
 }
