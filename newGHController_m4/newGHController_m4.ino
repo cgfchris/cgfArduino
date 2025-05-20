@@ -15,7 +15,6 @@ const int HEATER_RELAY_PIN = 4;
 const int SHADE_OPEN_RELAY_PIN = 5;
 const int SHADE_CLOSE_RELAY_PIN = 6;
 
-
 const unsigned long VENT_PULSE_DURATION_MS = 5000;
 const unsigned long SHADE_PULSE_DURATION_MS = 10000;
 const unsigned long REFRESH_INTERVAL_MS = 1 * 60 * 60 * 1000UL;
@@ -30,18 +29,14 @@ int currentVentStage_M4 = 0;
 bool heaterState_M4 = false;   
 bool shadeState_M4 = false;    
 bool boostModeActive_M4 = false;
-
 bool ventOpenRelayActive = false;
 unsigned long ventOpenRelayStopTime = 0;
 bool ventCloseRelayActive = false;
 unsigned long ventCloseRelayStopTime = 0;
-
-
 bool shadeOpenRelayActive = false;
 unsigned long shadeOpenRelayStopTime = 0;
 bool shadeCloseRelayActive = false;
 unsigned long shadeCloseRelayStopTime = 0;
-
 unsigned long lastVentRefreshTime = 0;
 unsigned long lastShadeRefreshTime = 0;
 
@@ -256,7 +251,6 @@ void checkRelayPulses(unsigned long currentTime) {
   }
 }
 
-
 void manageVents(unsigned long currentTime) {
   if (ventOpenRelayActive || ventCloseRelayActive) return;
 
@@ -396,14 +390,12 @@ void handleRefreshPulses(unsigned long currentTime) {
         } else { 
             RPC.println("M4: Shade: Refreshing CLOSED pulse.");
             setRelay(SHADE_CLOSE_RELAY_PIN, true); shadeCloseRelayActive = true;
-
             shadeCloseRelayStopTime = currentTime + (SHADE_PULSE_DURATION_MS / 2);
         }
      }
      lastShadeRefreshTime = currentTime;
   }
 }
-
 
 void reportStatus() {
   static unsigned long lastReportTime = 0;
@@ -427,6 +419,5 @@ void reportStatus() {
     RPC.println("Settings Dirty Flag: " + String(settingsDirty ? "YES (awaiting save)" : "NO"));
     RPC.println("--------------------------");
     lastReportTime = now;
-
   }
 }

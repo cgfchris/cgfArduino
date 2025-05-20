@@ -11,7 +11,6 @@
 #include "ntp_time.h"
 #include "temperature_system.h"
 
-
 Arduino_H7_Video Display(SCREEN_WIDTH, SCREEN_HEIGHT, GigaDisplayShield);
 Arduino_GigaDisplayTouch TouchDetector;
 
@@ -26,7 +25,6 @@ bool m4_boost_state = false;
 
 void setup() {
     Serial.begin(115200);
-
     unsigned long setupStartTime = millis();
     // Make this wait very short for initial debugging. If Serial never connects, we want to proceed.
     while (!Serial && (millis() - setupStartTime < 1000)); // Shortened wait
@@ -44,18 +42,6 @@ void setup() {
     delay(2000); // Give M4 time.
     Serial.println("DEBUG: M7: M4 init delay complete."); delay(100);
 
-
-    if (RPC.begin()) { // This will now attempt to start the M4 code you just flashed
-        Serial.println("M7: RPC.begin() successful. M4 should be booting/running its flashed code.");
-    } else {
-        Serial.println("M7: FATAL ERROR - RPC.begin() failed!");
-        // Potentially loop forever or indicate error clearly if this happens
-        // while(1) { delay(100); }
-    }
-
-    Serial.println("M7: M4 core should be booting now.");
-    delay(1000); // Give M4 some time to initialize
-    
     // --- Hardware and LVGL Initialization ---
     Serial.println("DEBUG: M7: Setup Phase 2 - Display.begin()..."); delay(100);
     Display.begin();
@@ -179,7 +165,6 @@ void exchangeDataWithM4AndRefreshUI() {
 unsigned long lastLoopHeartbeat = 0;
 
 void loop() {
-
     unsigned long currentTimeMs = millis();
     lv_timer_handler();
 
@@ -212,7 +197,6 @@ void loop() {
     if (m4_debug_buffer.length() > 0) {
         Serial.print(m4_debug_buffer); // Print M4's messages
     }
-
 
     delay(5);
 }
