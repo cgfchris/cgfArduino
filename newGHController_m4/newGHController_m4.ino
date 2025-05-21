@@ -148,6 +148,11 @@ void setShadeCloseTime_impl(uint8_t hour, uint8_t minute) {
     }
 }
 
+// NEW RPC function to get the entire settings struct
+GreenhouseSettings getM4CurrentSettings_impl() {
+    RPC.println("M4: M7 requested entire currentSettings struct.");
+    return currentSettings; // Return the global struct by value
+}
 
 // --- Helper Function to Control Relays ---
 void setRelay(int pin, bool on) {
@@ -203,6 +208,8 @@ void setup() {
     RPC.bind("setBoostDuration", setBoostDuration_impl);
     RPC.bind("setShadeOpenTime", setShadeOpenTime_impl);
     RPC.bind("setShadeCloseTime", setShadeCloseTime_impl);
+    // NEW RPC Binding for getting all settings
+    RPC.bind("getM4AllSettings", getM4CurrentSettings_impl);
     
     RPC.println("M4: Greenhouse Controller Initialized (FlashIAP Storage).");
     RPC.println("M4: Loaded Settings Preview: VentS1=" + String(currentSettings.ventOpenTempStage1,1) +
