@@ -69,62 +69,73 @@ void updateCurrentTemperatureFromM4(float m4_temp) {
 }
 
 void initializeTemperatureSystem() {
-    // Initialize historical samples array
-    for (int i = 0; i < MAX_TEMP_SAMPLES; i++) {
-        historicalSamples[i].temperature = NAN;
-        historicalSamples[i].timestamp = 0;
-        historicalSamples[i].isValidTimestamp = false;
+    // Initialize historicalSamples first, as chart will be populated based on it or in parallel.
+    time_t current_utc_for_init = 0;
+    bool time_is_valid_for_init = is_time_valid(); // From ntp_time.h
+
+    if (time_is_valid_for_init) {
+        time_t current_local_time = time(NULL); // This is local time from our NTP module
+        current_utc_for_init = current_local_time - ((long)NTP_TIMEZONE * 3600L); // Convert to UTC
     }
 
-    // Initialize the LVGL chart (ui_tempChart should be created by ui_init())
+    for (int i = 0; i < MAX_TEMP_SAMPLES; i++) {
+        historicalSamples[i].temperature = NAN; // Or CHART_Y_MIN_VALUE to avoid empty look
+        if (time_is_valid_for_init) {
+            // Populate with backdated timestamps, newest sample at MAX_TEMP_SAMPLES - 1
+            // Oldest sample at index 0
+            historicalSamples[i].timestamp = current_utc_for_init - ((MAX_TEMP_SAMPLES - 1 - i) * (TEMP_SAMPLE_INTERVAL_MS / 1000L));
+            historicalSamples[i].isValidTimestamp = true;
+        } else {
+            historicalSamples[i].timestamp = 0;
+            historicalSamples[i].isValidTimestamp = false;
+        }
+    }
+
     if (ui_tempChart != NULL) {
         lv_chart_set_type(ui_tempChart, LV_CHART_TYPE_LINE);
-        lv_chart_set_update_mode(ui_tempChart, LV_CHART_UPDATE_MODE_SHIFT); // Data shifts left
+        lv_chart_set_update_mode(ui_tempChart, LV_CHART_UPDATE_MODE_SHIFT);
         lv_chart_set_point_count(ui_tempChart, MAX_TEMP_SAMPLES);
-        // CHART_Y_MIN_VALUE and CHART_Y_MAX_VALUE should be in config.h or temperature_system.h
         lv_chart_set_range(ui_tempChart, LV_CHART_AXIS_PRIMARY_Y, CHART_Y_MIN_VALUE, CHART_Y_MAX_VALUE);
 
-        // Add a series to the chart
         ui_tempChartSeries = lv_chart_add_series(ui_tempChart, lv_palette_main(LV_PALETTE_BLUE), LV_CHART_AXIS_PRIMARY_Y);
         if (!ui_tempChartSeries) {
             Serial.println("M7-TempSys: Error! Failed to add series to chart!");
-            return; // Critical error, chart won't work
+            return;
         }
 
-        // Initialize chart points to a baseline (e.g., min value)
-        for (int i = 0; i < MAX_TEMP_SAMPLES; i++) {
-            lv_chart_set_next_value(ui_tempChart, ui_tempChartSeries, CHART_Y_MIN_VALUE);
-        }
+        // Initialize chart points. For SHIFT mode, lv_chart_set_next_value adds to the "end" (newest point)
+        // and shifts others. To fill it initially, we can set all points.
+        // Or, more aligned with SHIFT mode, add MAX_TEMP_SAMPLES initial values.
+        // The historicalSamples array now holds what the chart *should* display initially.
+        lv_chart_set_all_value(ui_tempChart, ui_tempChartSeries, CHART_Y_MIN_VALUE); // Set all to a baseline first
+        
+        // If you wanted to pre-populate with some semblance of history (if available and valid)
+        // you could iterate and use lv_chart_set_value_by_id, but for SHIFT mode,
+        // it's usually about feeding new values. The labels will pick up from historicalSamples.
+        // The initial CHART_Y_MIN_VALUE fill is fine; the labels will use historicalSamples.
 
-        // Configure X-axis ticks and labels (same as your original)
-        uint8_t num_x_major_ticks = 5; // Example: 5 major ticks
+        // Configure X-axis ticks and labels (SAME AS YOUR PREVIOUS CODE)
+        uint8_t num_x_major_ticks = 5;
         lv_coord_t major_tick_len = 7;
         lv_coord_t minor_tick_len = 4;
-        // Auto calculate minor ticks, ensure denominator isn't zero
-        uint8_t num_minor_ticks_between_major = (MAX_TEMP_SAMPLES / num_x_major_ticks) > 1 ? (MAX_TEMP_SAMPLES / (num_x_major_ticks +1) ) / 2 -1 : 0;
-        num_minor_ticks_between_major = (num_minor_ticks_between_major > 0) ? num_minor_ticks_between_major : 0; // ensure non-negative
-
+        uint8_t num_minor_ticks_between_major = (MAX_TEMP_SAMPLES / (num_x_major_ticks +1) ) > 1 ? (MAX_TEMP_SAMPLES / (num_x_major_ticks +1) ) / 2 -1 : 0;
+        num_minor_ticks_between_major = (num_minor_ticks_between_major > 0) ? num_minor_ticks_between_major : 0;
         bool draw_labels_for_major_ticks = true;
-        lv_coord_t extra_draw_space_for_labels = 25; // Space below X-axis for labels
+        lv_coord_t extra_draw_space_for_labels = 25;
 
         lv_chart_set_axis_tick(ui_tempChart, LV_CHART_AXIS_PRIMARY_X,
                        major_tick_len, minor_tick_len,
                        num_x_major_ticks, num_minor_ticks_between_major,
                        draw_labels_for_major_ticks, extra_draw_space_for_labels);
         
-        // Add event callback for drawing custom X-axis tick labels
         lv_obj_add_event_cb(ui_tempChart, chart_x_axis_draw_event_cb, LV_EVENT_DRAW_PART_BEGIN, NULL);
-        lv_obj_invalidate(ui_tempChart); // Force redraw after setup
+        lv_obj_invalidate(ui_tempChart);
         Serial.println("M7-TempSys: Temperature Chart Initialized.");
     } else {
-        Serial.println("M7-TempSys: Error! ui_tempChart object (from ui.h) not found!");
+        Serial.println("M7-TempSys: Error! ui_tempChart object not found!");
     }
 
-    lastSampleTime = millis(); // Initialize timer for chart sampling
-
-    // currentTemperature_local will be updated by data from M4.
-    // The main ui_tempLabel (current temperature display) will be updated in the main .ino loop
-    // using data fetched directly from M4. This module (temperature_system) primarily manages the chart.
+    lastSampleTime = millis(); // Initialize for the next sample in updateTemperatureSystem
 }
 
 void updateTemperatureSystem() { // This function now primarily updates the chart

@@ -24,8 +24,8 @@
 
 // --- Temperature System Configuration ---
 #define TEMP_READ_INTERVAL_MS 2000
-#define TEMP_SAMPLE_INTERVAL_MS (10 * 1000) // 10 seconds for testing
-// #define TEMP_SAMPLE_INTERVAL_MS (5 * 60 * 1000) // 5 minutes for production
+//#define TEMP_SAMPLE_INTERVAL_MS (10 * 1000) // 10 seconds for testing
+#define TEMP_SAMPLE_INTERVAL_MS (5 * 60 * 1000) // 5 minutes for production
 #define MAX_TEMP_SAMPLES 100
 #define CHART_Y_MIN_VALUE 0
 #define CHART_Y_MAX_VALUE 50

@@ -180,7 +180,7 @@ void exchangeDataWithM4AndRefreshUI_LVGL() {
     snprintf(statusBuffer, sizeof(statusBuffer), "%.1f", m4_settings_cache.ventOpenTempStage2);
     lv_label_set_text(ui_vent50, statusBuffer);
     snprintf(statusBuffer, sizeof(statusBuffer), "%.1f", m4_settings_cache.ventOpenTempStage3);
-    lv_label_set_text(ui_vent50, statusBuffer);
+    lv_label_set_text(ui_vent100, statusBuffer);
     snprintf(statusBuffer, sizeof(statusBuffer), "%.1f", m4_settings_cache.heatSetTempNight);
     lv_label_set_text(ui_heatNight, statusBuffer);
     snprintf(statusBuffer, sizeof(statusBuffer), "%.1f", m4_settings_cache.heatSetTempDay);

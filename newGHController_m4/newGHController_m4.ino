@@ -21,13 +21,11 @@ bool ventOpenRelayActive = false;
 unsigned long ventOpenRelayStopTime = 0;
 bool ventCloseRelayActive = false;
 unsigned long ventCloseRelayStopTime = 0;
-bool shadeOpenRelayActive = false;
-unsigned long shadeOpenRelayStopTime = 0;
-bool shadeCloseRelayActive = false;
-unsigned long shadeCloseRelayStopTime = 0;
 unsigned long lastVentRefreshTime = 0;
-unsigned long lastShadeRefreshTime = 0;
 
+// NEW: To report to M7 which shade relay is currently energized
+bool shadeOpenRelayCommandedOn = false;
+bool shadeCloseRelayCommandedOn = false;
 
 // --- RPC Exposed Functions & Implementations ---
 // ... (ALL your RPC functions: receiveTimeFromM7_impl, getM4Temperature_impl,
@@ -47,8 +45,13 @@ bool getM4BoostState_impl() { return boostModeActive_M4; }
 bool getM4VentOpeningActive_impl() {return ventOpenRelayActive;}
 bool getM4VentClosingActive_impl() {return ventCloseRelayActive;}
 // getM4HeaterState_impl() already gives heater relay status
-bool getM4ShadeOpeningActive_impl() {return shadeOpenRelayActive;}
-bool getM4ShadeClosingActive_impl() {return shadeCloseRelayActive;}
+// NEW/REVISED RPC Getters for M7 UI indicator boxes:
+bool getM4ShadeOpeningRelayActive_impl() { // Reports if the "open" relay is currently commanded ON
+    return shadeOpenRelayCommandedOn;
+}
+bool getM4ShadeClosingRelayActive_impl() { // Reports if the "close" relay is currently commanded ON
+    return shadeCloseRelayCommandedOn;
+}
 
 // --- RPC Implementations for M7 to update settings in M4's RAM ---
 void setVentTempS1_impl(float temp) {
@@ -199,6 +202,8 @@ void setup() {
     setRelay(HEATER_RELAY_PIN2, false);
     setRelay(SHADE_OPEN_RELAY_PIN, false);
     setRelay(SHADE_CLOSE_RELAY_PIN, false);
+    shadeOpenRelayCommandedOn = false;
+    shadeCloseRelayCommandedOn = false;
 
     // RPC Bindings (same as before)
     RPC.bind("receiveTimeFromM7", receiveTimeFromM7_impl);
@@ -211,8 +216,8 @@ void setup() {
     // Bind NEW relay activity getters
     RPC.bind("getVentOpeningActive", getM4VentOpeningActive_impl);
     RPC.bind("getVentClosingActive", getM4VentClosingActive_impl);
-    RPC.bind("getShadeOpeningActive", getM4ShadeOpeningActive_impl);
-    RPC.bind("getShadeClosingActive", getM4ShadeClosingActive_impl);
+    RPC.bind("getShadeOpeningRelayActive", getM4ShadeOpeningRelayActive_impl); // New/Revised
+    RPC.bind("getShadeClosingRelayActive", getM4ShadeClosingRelayActive_impl); // New/Revised
 
     RPC.bind("setVentTempS1", setVentTempS1_impl);
     RPC.bind("setVentTempS2", setVentTempS2_impl);
@@ -235,7 +240,7 @@ void setup() {
                 "C, Hys=" + String(currentSettings.hysteresis,1) + "C");
 
     lastVentRefreshTime = millis();
-    lastShadeRefreshTime = millis();
+    //lastShadeRefreshTime = millis();
 }
 
 void loop() {
@@ -266,14 +271,6 @@ void checkRelayPulses(unsigned long currentTime) {
   if (ventCloseRelayActive && currentTime >= ventCloseRelayStopTime) {
     setRelay(VENT_CLOSE_RELAY_PIN, false); ventCloseRelayActive = false;
     RPC.println("M4: Vent Close Pulse FINISHED.");
-  }
-  if (shadeOpenRelayActive && currentTime >= shadeOpenRelayStopTime) {
-    setRelay(SHADE_OPEN_RELAY_PIN, false); shadeOpenRelayActive = false;
-    RPC.println("M4: Shade Open Pulse FINISHED.");
-  }
-  if (shadeCloseRelayActive && currentTime >= shadeCloseRelayStopTime) {
-    setRelay(SHADE_CLOSE_RELAY_PIN, false); shadeCloseRelayActive = false;
-    RPC.println("M4: Shade Close Pulse FINISHED.");
   }
 }
 
@@ -363,8 +360,10 @@ void manageHeater(unsigned long currentTime) {
     }
 }
 
+// --- UPDATED Shade Management (Non-Pulsed) ---
 void manageShade(unsigned long currentTime) {
-    if (shadeOpenRelayActive || shadeCloseRelayActive) return;
+    // This function is now responsible for setting the continuous state of shade relays
+
     bool desiredShadeStateBasedOnTime;
     uint16_t now_minutes = currentHour_M4 * 60 + currentMinute_M4;
     uint16_t shadeOpen_minutes = currentSettings.shadeOpenHour * 60 + currentSettings.shadeOpenMinute;
@@ -375,22 +374,42 @@ void manageShade(unsigned long currentTime) {
     } else if (shadeOpen_minutes > shadeClose_minutes) { 
         desiredShadeStateBasedOnTime = (now_minutes >= shadeOpen_minutes || now_minutes < shadeClose_minutes);
     } else { 
+        // If open and close times are identical, assume shade should remain in its current manually set state,
+        // or default to closed if no manual override exists. For this logic, default to closed.
         desiredShadeStateBasedOnTime = false; 
     }
 
+    // Update shadeState_M4 if the desired state based on time has changed
+    // Or if it's the first run and we need to establish the correct state.
     if (desiredShadeStateBasedOnTime != shadeState_M4) {
-        String actionVerb = desiredShadeStateBasedOnTime ? "OPEN" : "CLOSE";
-        RPC.println("M4: Shade: Target " + actionVerb + " based on time. (" + String(currentHour_M4) + ":" + String(currentMinute_M4 < 10 ? "0" : "") + String(currentMinute_M4) +")");
-        setRelay(desiredShadeStateBasedOnTime ? SHADE_OPEN_RELAY_PIN : SHADE_CLOSE_RELAY_PIN, true);
-        if (desiredShadeStateBasedOnTime) { 
-            shadeOpenRelayActive = true; shadeOpenRelayStopTime = currentTime + SHADE_PULSE_DURATION_MS; 
-        } else { 
-            shadeCloseRelayActive = true; shadeCloseRelayStopTime = currentTime + SHADE_PULSE_DURATION_MS; 
+        RPC.println("M4: Shade: Time (" + String(currentHour_M4) + ":" + String(currentMinute_M4) +
+                      ") dictates state " + (desiredShadeStateBasedOnTime ? "OPEN" : "CLOSED") +
+                      ". Current assumed state: " + (shadeState_M4 ? "OPEN" : "CLOSED") + ". Changing.");
+        shadeState_M4 = desiredShadeStateBasedOnTime; // Update our understanding of the shade's position
+        // lastShadeRefreshTime = currentTime; // Reset refresh timer if using one
+    }
+
+    // Now, set the relays based on the current shadeState_M4 (which reflects the desired state)
+    // This block runs every cycle of manageShade to ensure relays are correctly set.
+    if (shadeState_M4) { // Target is OPEN
+        if (!shadeOpenRelayCommandedOn || shadeCloseRelayCommandedOn) { // If not already correctly set
+            RPC.println("M4: Shade: Commanding OPEN relay ON, CLOSE relay OFF.");
+            setRelay(SHADE_OPEN_RELAY_PIN, true);
+            setRelay(SHADE_CLOSE_RELAY_PIN, false);
+            shadeOpenRelayCommandedOn = true;
+            shadeCloseRelayCommandedOn = false;
         }
-        shadeState_M4 = desiredShadeStateBasedOnTime; 
-        lastShadeRefreshTime = currentTime;
+    } else { // Target is CLOSED
+        if (shadeOpenRelayCommandedOn || !shadeCloseRelayCommandedOn) { // If not already correctly set
+            RPC.println("M4: Shade: Commanding CLOSE relay ON, OPEN relay OFF.");
+            setRelay(SHADE_OPEN_RELAY_PIN, false);
+            setRelay(SHADE_CLOSE_RELAY_PIN, true);
+            shadeOpenRelayCommandedOn = false;
+            shadeCloseRelayCommandedOn = true;
+        }
     }
 }
+
 
 void handleRefreshPulses(unsigned long currentTime) {
   if (currentTime - lastVentRefreshTime >= REFRESH_INTERVAL_MS) {
@@ -407,26 +426,14 @@ void handleRefreshPulses(unsigned long currentTime) {
     }
     lastVentRefreshTime = currentTime;
   }
-  if (currentTime - lastShadeRefreshTime >= REFRESH_INTERVAL_MS) {
-     if (!shadeOpenRelayActive && !shadeCloseRelayActive) {
-        if (shadeState_M4) { 
-            RPC.println("M4: Shade: Refreshing OPEN pulse.");
-            setRelay(SHADE_OPEN_RELAY_PIN, true); shadeOpenRelayActive = true;
-            shadeOpenRelayStopTime = currentTime + (SHADE_PULSE_DURATION_MS / 2);
-        } else { 
-            RPC.println("M4: Shade: Refreshing CLOSED pulse.");
-            setRelay(SHADE_CLOSE_RELAY_PIN, true); shadeCloseRelayActive = true;
-            shadeCloseRelayStopTime = currentTime + (SHADE_PULSE_DURATION_MS / 2);
-        }
-     }
-     lastShadeRefreshTime = currentTime;
-  }
 }
 
+// reportStatus - update to reflect new shade relay command booleans
 void reportStatus() {
   static unsigned long lastReportTime = 0;
   unsigned long now = millis();
   if (now - lastReportTime >= 20000) { 
+    // ... (Time, Temp, Vent, Heater status - same) ...
     RPC.println("--- M4 Status Report ---");
     RPC.println("Time: " + String(currentHour_M4) + ":" + String(currentMinute_M4<10?"0":"") + String(currentMinute_M4) +
                 " | Temp: " + String(currentGreenhouseTemp_M4, 1) + "C");
@@ -438,9 +445,14 @@ void reportStatus() {
     RPC.println(ventStatusStr +
                 (ventOpenRelayActive ? " (Opening)" : "") +
                 (ventCloseRelayActive ? " (Closing)" : ""));
-    RPC.println("Heater: " + String(heaterState_M4 ? "ON" : "OFF") + " | Shade: " + String(shadeState_M4 ? "OPEN" : "CLOSED") +
-                (shadeOpenRelayActive ? " (Opening)" : "") +
-                (shadeCloseRelayActive ? " (Closing)" : ""));
+    RPC.println("Heater: " + String(heaterState_M4 ? "ON" : "OFF"));
+
+    // Updated Shade Status line
+    String shadeStatusDisplay = "Shade: " + String(shadeState_M4 ? "COMMANDED OPEN" : "COMMANDED CLOSED");
+    if (shadeOpenRelayCommandedOn) shadeStatusDisplay += " (OpenRelay ON)";
+    if (shadeCloseRelayCommandedOn) shadeStatusDisplay += " (CloseRelay ON)";
+    RPC.println(shadeStatusDisplay);
+    
     RPC.println("Boost Mode: " + String(boostModeActive_M4 ? "ACTIVE" : "OFF"));
     RPC.println("Settings Dirty Flag: " + String(settingsDirty ? "YES (awaiting save)" : "NO"));
     RPC.println("--------------------------");
