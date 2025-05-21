@@ -2,23 +2,11 @@
 #include <RPC.h>
 #include <Arduino.h>
 #include "settings_storage.h" // Our settings module using FlashIAPBlockDevice
+#include "config.h"
 
 // --- Global Instance of Settings (used by settings_storage.cpp via extern) ---
 GreenhouseSettings currentSettings;
 bool settingsDirty = false;
-
-// --- Hardware Configuration Constants (Pins, Fixed Durations) ---
-// ... (Same as your previous M4 sketch: VENT_OPEN_RELAY_PIN, etc.)
-const int VENT_OPEN_RELAY_PIN = 2;
-const int VENT_CLOSE_RELAY_PIN = 3;
-const int HEATER_RELAY_PIN = 4;
-const int SHADE_OPEN_RELAY_PIN = 5;
-const int SHADE_CLOSE_RELAY_PIN = 6;
-
-const unsigned long VENT_PULSE_DURATION_MS = 5000;
-const unsigned long SHADE_PULSE_DURATION_MS = 10000;
-const unsigned long REFRESH_INTERVAL_MS = 1 * 60 * 60 * 1000UL;
-
 
 // --- Global State Variables (Operational) ---
 // ... (Same as your previous M4 sketch: currentGreenhouseTemp_M4, currentHour_M4, etc.) ...
@@ -54,6 +42,13 @@ int getM4VentStage_impl() { return currentVentStage_M4; }
 bool getM4HeaterState_impl() { return heaterState_M4; }
 bool getM4ShadeState_impl() { return shadeState_M4; }
 bool getM4BoostState_impl() { return boostModeActive_M4; }
+
+// --- NEW RPC Getter functions for relay pulse activity ---
+bool getM4VentOpeningActive_impl() {return ventOpenRelayActive;}
+bool getM4VentClosingActive_impl() {return ventCloseRelayActive;}
+// getM4HeaterState_impl() already gives heater relay status
+bool getM4ShadeOpeningActive_impl() {return shadeOpenRelayActive;}
+bool getM4ShadeClosingActive_impl() {return shadeCloseRelayActive;}
 
 // --- RPC Implementations for M7 to update settings in M4's RAM ---
 void setVentTempS1_impl(float temp) {
@@ -167,6 +162,22 @@ void updateM4OwnTemperature() {
     if (simTempM4 > 34.0) simTempDirM4 = -1;
     if (simTempM4 < 11.0) simTempDirM4 = 1;
     currentGreenhouseTemp_M4 = simTempM4;
+
+/*
+ * new code:
+    float tempM4;
+    tempM4 = analogRead(SENSOR4_PIN);
+    currentGreenhouseTemp_M4 = float(S4_CAL_T2)+float(S4_SLOPE)*float(s4_in-S4_CAL_V2);
+ */
+
+    /* code from temperatureController v1.8:
+     *  // read from sensor 4 (aspirator)
+    s4_in=analogRead(SENSOR4_PIN);
+    SERIALPRINTLN(s4_in);
+    //SERIALPRINTLN(S4_SLOPE);
+    //SERIALPRINTLN(s4_in-S4_CAL_V2);
+    sens[3].val=float(S4_CAL_T2)+float(S4_SLOPE)*float(s4_in-S4_CAL_V2);
+    */
 }
 
 
@@ -177,13 +188,15 @@ void setup() {
     // ... (pinModes and setRelay calls for initialization - same as before) ...
     pinMode(VENT_OPEN_RELAY_PIN, OUTPUT);
     pinMode(VENT_CLOSE_RELAY_PIN, OUTPUT);
-    pinMode(HEATER_RELAY_PIN, OUTPUT);
+    pinMode(HEATER_RELAY_PIN1, OUTPUT);
+    pinMode(HEATER_RELAY_PIN2, OUTPUT);
     pinMode(SHADE_OPEN_RELAY_PIN, OUTPUT);
     pinMode(SHADE_CLOSE_RELAY_PIN, OUTPUT);
 
     setRelay(VENT_OPEN_RELAY_PIN, false);
     setRelay(VENT_CLOSE_RELAY_PIN, false);
-    setRelay(HEATER_RELAY_PIN, false);
+    setRelay(HEATER_RELAY_PIN1, false);
+    setRelay(HEATER_RELAY_PIN2, false);
     setRelay(SHADE_OPEN_RELAY_PIN, false);
     setRelay(SHADE_CLOSE_RELAY_PIN, false);
 
@@ -194,6 +207,12 @@ void setup() {
     RPC.bind("getM4HeaterState", getM4HeaterState_impl);
     RPC.bind("getM4ShadeState", getM4ShadeState_impl);
     RPC.bind("getM4BoostState", getM4BoostState_impl);
+
+    // Bind NEW relay activity getters
+    RPC.bind("getVentOpeningActive", getM4VentOpeningActive_impl);
+    RPC.bind("getVentClosingActive", getM4VentClosingActive_impl);
+    RPC.bind("getShadeOpeningActive", getM4ShadeOpeningActive_impl);
+    RPC.bind("getShadeClosingActive", getM4ShadeClosingActive_impl);
 
     RPC.bind("setVentTempS1", setVentTempS1_impl);
     RPC.bind("setVentTempS2", setVentTempS2_impl);
@@ -281,12 +300,12 @@ void manageVents(unsigned long currentTime) {
   if (targetVentStage > currentVentStage_M4) {
     RPC.println("M4: Vents: Target OPEN from " + String(currentVentStage_M4) + " to " + String(targetVentStage));
     setRelay(VENT_OPEN_RELAY_PIN, true); ventOpenRelayActive = true;
-    ventOpenRelayStopTime = currentTime + VENT_PULSE_DURATION_MS * (targetVentStage - currentVentStage_M4);
+    ventOpenRelayStopTime = currentTime + VENT_CHANGE_DURATION_MS * (targetVentStage - currentVentStage_M4);
     currentVentStage_M4 = targetVentStage; lastVentRefreshTime = currentTime;
   } else if (targetVentStage < currentVentStage_M4) {
     RPC.println("M4: Vents: Target CLOSE from " + String(currentVentStage_M4) + " to " + String(targetVentStage));
     setRelay(VENT_CLOSE_RELAY_PIN, true); ventCloseRelayActive = true;
-    ventCloseRelayStopTime = currentTime + VENT_PULSE_DURATION_MS * (currentVentStage_M4 - targetVentStage);
+    ventCloseRelayStopTime = currentTime + VENT_CHANGE_DURATION_MS * (currentVentStage_M4 - targetVentStage);
     currentVentStage_M4 = targetVentStage; lastVentRefreshTime = currentTime;
   }
 }
@@ -337,7 +356,7 @@ void manageHeater(unsigned long currentTime) {
         }
     }
     if (newHeaterState != heaterState_M4) {
-        heaterState_M4 = newHeaterState; setRelay(HEATER_RELAY_PIN, heaterState_M4);
+        heaterState_M4 = newHeaterState; setRelay(HEATER_RELAY_PIN1, heaterState_M4);setRelay(HEATER_RELAY_PIN2, heaterState_M4);
         RPC.println("M4: Heater " + String(heaterState_M4 ? "ON" : "OFF") +
                     " (Mode: " + modeDescr + ", SetT: " + String(actualHeatSetTemp,1) +
                     "C, CurrT: " + String(currentGreenhouseTemp_M4,1) + "C)");
@@ -379,11 +398,11 @@ void handleRefreshPulses(unsigned long currentTime) {
       if (currentVentStage_M4 == 3) { 
         RPC.println("M4: Vents: Refreshing FULLY OPEN pulse.");
         setRelay(VENT_OPEN_RELAY_PIN, true); ventOpenRelayActive = true;
-        ventOpenRelayStopTime = currentTime + (VENT_PULSE_DURATION_MS / 2); 
+        ventOpenRelayStopTime = currentTime + (VENT_PULSE_DURATION_MS); 
       } else if (currentVentStage_M4 == 0) { 
         RPC.println("M4: Vents: Refreshing FULLY CLOSED pulse.");
         setRelay(VENT_CLOSE_RELAY_PIN, true); ventCloseRelayActive = true;
-        ventCloseRelayStopTime = currentTime + (VENT_PULSE_DURATION_MS / 2);
+        ventCloseRelayStopTime = currentTime + (VENT_PULSE_DURATION_MS);
       }
     }
     lastVentRefreshTime = currentTime;

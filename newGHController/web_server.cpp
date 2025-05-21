@@ -290,7 +290,7 @@ void handle_web_server_clients() {
                 client.println("HTTP/1.1 200 OK"); client.println("Content-type:text/html"); client.println("Connection: close"); client.println();
                 client.println("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Greenhouse Control</title>");
                 client.println("<meta name='viewport' content='width=device-width, initial-scale=1'>");
-                // client.println("<meta http-equiv='refresh' content='10'>"); // Keep refresh off for now if still debugging 
+                // client.println("<meta http-equiv='refresh' content='10'>"); // Keep refresh off if debug needed
                 client.println("<style>body{font-family:Helvetica,Arial,sans-serif; margin:15px; background-color:#f0f2f5;}");
                 client.println("h1,h2{color:#333;} table{border-collapse:collapse; width:auto; margin-bottom:25px; background-color:white; box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);} ");
                 client.println("th,td{border:1px solid #ddd; padding:8px 12px; text-align:left;}");
@@ -301,6 +301,9 @@ void handle_web_server_clients() {
                 char timeBuf[12], dateBuf[24];
                 get_formatted_local_time(timeBuf, sizeof(timeBuf)); get_formatted_local_date(dateBuf, sizeof(dateBuf)); 
                 client.print("<p>Time: <strong>"); client.print(timeBuf); client.print("</strong>   Date: <strong>"); client.print(dateBuf); client.print("</strong></p>");
+                // --- ADD MANUAL REFRESH BUTTON ---
+                client.println("<button class='refresh-button' onclick='location.reload();'>Refresh Status & Settings</button>");
+                // --- END MANUAL REFRESH BUTTON ---
                 client.println("<h2>Current Status</h2><table><tr><th>Parameter</th><th>Value</th></tr>");
                 client.print("<tr><td>Temperature</td><td>"); if (!isnan(m4_reported_temperature)) { client.print(m4_reported_temperature, 1); client.print(" °C"); } else { client.print("N/A"); } client.println("</td></tr>");
                 client.print("<tr><td>Vents</td><td>"); if (m4_vent_stage == 0) client.print("Closed"); else if (m4_vent_stage == 1) client.print("Stage 1 (25%)"); else if (m4_vent_stage == 2) client.print("Stage 2 (50%)"); else if (m4_vent_stage == 3) client.print("Stage 3 (100%)"); else client.print("N/A"); client.println("</td></tr>");

@@ -26,13 +26,17 @@ int m4_vent_stage = -1;
 bool m4_heater_state = false;
 bool m4_shade_state = false;
 bool m4_boost_state = false;
+bool m4_vent_opening_active = false;
+bool m4_vent_closing_active = false;
+bool m4_shade_opening_active = false;
+bool m4_shade_closing_active = false;
 
 // Buffers for LVGL labels (main file manages these)
 char tempLabelBufferMain[10];
 char ventStatusBuffer[20];     // For LVGL ui_ventStatusLabel
 char heaterStatusBuffer[15];   // For LVGL ui_heaterStatusLabel
 char shadeStatusBuffer[15];    // For LVGL ui_shadeStatusLabel
-char boostStatusBuffer[15];    // For LVGL ui_boostStatusLabel
+char statusBuffer[15];    // For LVGL any buffer
 
 // M7's cache of M4's configurable settings
 GreenhouseSettings m4_settings_cache; // M7 will fill this from M4
@@ -74,6 +78,18 @@ void setup() {
     lastM4DataExchangeTime = millis();
 }
 
+// Function to update the color of an LVGL object (your box)
+void update_indicator_box_color(lv_obj_t* box_obj, bool isActive) {
+    if (box_obj) { // Check if the object exists
+        if (isActive) {
+            lv_obj_set_style_bg_color(box_obj, lv_color_hex(0xFF0000), LV_PART_MAIN | LV_STATE_DEFAULT); // Red for active
+        } else {
+            lv_obj_set_style_bg_color(box_obj, lv_color_hex(0xFFFFFF), LV_PART_MAIN | LV_STATE_DEFAULT); // White for inactive
+        }
+        lv_obj_set_style_bg_opa(box_obj, LV_OPA_COVER, LV_PART_MAIN | LV_STATE_DEFAULT); // Ensure it's opaque
+    }
+}
+
 // exchangeDataWithM4AndRefreshUI() - now dedicated to LVGL UI updates
 // (This function is mostly the same as your last working version for individual labels)
 void exchangeDataWithM4AndRefreshUI_LVGL() {
@@ -102,10 +118,10 @@ void exchangeDataWithM4AndRefreshUI_LVGL() {
     try { auto h = RPC.call("getM4VentStage"); m4_vent_stage = h.as<int>(); } 
     catch (const std::exception& e) { m4_vent_stage = -1; }
     if (ui_ventStatusLabel) { 
-        if (m4_vent_stage == 0) snprintf(ventStatusBuffer, sizeof(ventStatusBuffer), "Vents: Closed");
-        else if (m4_vent_stage == 1) snprintf(ventStatusBuffer, sizeof(ventStatusBuffer), "Vents: 25%%");
-        else if (m4_vent_stage == 2) snprintf(ventStatusBuffer, sizeof(ventStatusBuffer), "Vents: 50%%");
-        else if (m4_vent_stage == 3) snprintf(ventStatusBuffer, sizeof(ventStatusBuffer), "Vents: 100%%");
+        if (m4_vent_stage == 0) snprintf(ventStatusBuffer, sizeof(ventStatusBuffer), "0 %%");
+        else if (m4_vent_stage == 1) snprintf(ventStatusBuffer, sizeof(ventStatusBuffer), "25 %%");
+        else if (m4_vent_stage == 2) snprintf(ventStatusBuffer, sizeof(ventStatusBuffer), "50 %%");
+        else if (m4_vent_stage == 3) snprintf(ventStatusBuffer, sizeof(ventStatusBuffer), "100 %%");
         else snprintf(ventStatusBuffer, sizeof(ventStatusBuffer), "Vents: N/A");
         lv_label_set_text(ui_ventStatusLabel, ventStatusBuffer);
     }
@@ -113,23 +129,28 @@ void exchangeDataWithM4AndRefreshUI_LVGL() {
     try { auto h = RPC.call("getM4HeaterState"); m4_heater_state = h.as<bool>(); } 
     catch (const std::exception& e) { /* retain old */ }
     if (ui_heaterStatusLabel) { 
-        snprintf(heaterStatusBuffer, sizeof(heaterStatusBuffer), "Heater: %s", m4_heater_state ? "ON" : "OFF");
+        if (m4_boost_state){
+          snprintf(heaterStatusBuffer, sizeof(heaterStatusBuffer), "%s", "Boost");
+        }
+        snprintf(heaterStatusBuffer, sizeof(heaterStatusBuffer), "%s", m4_heater_state ? "ON" : "OFF");
         lv_label_set_text(ui_heaterStatusLabel, heaterStatusBuffer);
     }
     
     try { auto h = RPC.call("getM4ShadeState"); m4_shade_state = h.as<bool>(); }
     catch (const std::exception& e) { /* retain old */ }
     if (ui_shadeStatusLabel) { 
-        snprintf(shadeStatusBuffer, sizeof(shadeStatusBuffer), "Shade: %s", m4_shade_state ? "Open" : "Closed");
+        snprintf(shadeStatusBuffer, sizeof(shadeStatusBuffer), "%s", m4_shade_state ? "Open" : "Closed");
         lv_label_set_text(ui_shadeStatusLabel, shadeStatusBuffer);
     }
 
+/*
     try { auto h = RPC.call("getM4BoostState"); m4_boost_state = h.as<bool>(); }
-    catch (const std::exception& e) { /* retain old */ }
+    catch (const std::exception& e)
     if (ui_boostStatusLabel) { 
         snprintf(boostStatusBuffer, sizeof(boostStatusBuffer), "Boost: %s", m4_boost_state ? "Active" : "Off");
         lv_label_set_text(ui_boostStatusLabel, boostStatusBuffer);
     }
+*/
 
   // --- Fetch all configurable settings from M4 into m4_settings_cache ---
     Serial.println("M7: Fetching all settings from M4 for cache..."); // Keep this for now
@@ -153,7 +174,59 @@ void exchangeDataWithM4AndRefreshUI_LVGL() {
         // m4_settings_cache will retain its old values. Consider if you need to clear it or set a flag.
     }
 
+    // print the settings to the display:
+    snprintf(statusBuffer, sizeof(statusBuffer), "%.1f", m4_settings_cache.ventOpenTempStage1);
+    lv_label_set_text(ui_vent25, statusBuffer);
+    snprintf(statusBuffer, sizeof(statusBuffer), "%.1f", m4_settings_cache.ventOpenTempStage2);
+    lv_label_set_text(ui_vent50, statusBuffer);
+    snprintf(statusBuffer, sizeof(statusBuffer), "%.1f", m4_settings_cache.ventOpenTempStage3);
+    lv_label_set_text(ui_vent50, statusBuffer);
+    snprintf(statusBuffer, sizeof(statusBuffer), "%.1f", m4_settings_cache.heatSetTempNight);
+    lv_label_set_text(ui_heatNight, statusBuffer);
+    snprintf(statusBuffer, sizeof(statusBuffer), "%.1f", m4_settings_cache.heatSetTempDay);
+    lv_label_set_text(ui_heatDay, statusBuffer);
+    
+    snprintf(statusBuffer,sizeof(statusBuffer),"%02u:%02u",m4_settings_cache.dayStartHour,m4_settings_cache.dayStartMinute);
+    lv_label_set_text(ui_startDay, statusBuffer);
+    snprintf(statusBuffer,sizeof(statusBuffer),"%02u:%02u",m4_settings_cache.nightStartHour,m4_settings_cache.nightStartMinute);
+    lv_label_set_text(ui_startNight, statusBuffer);
+    snprintf(statusBuffer,sizeof(statusBuffer),"%02u:%02u",m4_settings_cache.shadeOpenHour,m4_settings_cache.shadeOpenMinute);
+    lv_label_set_text(ui_startShade, statusBuffer);
+    snprintf(statusBuffer,sizeof(statusBuffer),"%02u:%02u",m4_settings_cache.shadeCloseHour,m4_settings_cache.shadeCloseMinute);
+    lv_label_set_text(ui_endShade, statusBuffer);
+    snprintf(statusBuffer,sizeof(statusBuffer),"%02u:%02u",m4_settings_cache.boostStartHour,m4_settings_cache.boostStartMinute);
+    lv_label_set_text(ui_boostStart, statusBuffer);
+    snprintf(statusBuffer,sizeof(statusBuffer),"%u",m4_settings_cache.boostDurationMinutes);
+    lv_label_set_text(ui_boostDur, statusBuffer);
+    snprintf(statusBuffer, sizeof(statusBuffer), "%.1f", m4_settings_cache.heatBoostTemp);
+    lv_label_set_text(ui_boostTemp, statusBuffer);
+
+
+    // get relay states:
+    // --- Fetch Relay Activity States from M4 ---
+    try { auto h = RPC.call("getVentOpeningActive"); m4_vent_opening_active = h.as<bool>(); } 
+    catch (const std::exception& e) { /* Serial.println("M7 Exc: VentOpenActive"); */ }
+
+    try { auto h = RPC.call("getVentClosingActive"); m4_vent_closing_active = h.as<bool>(); }
+    catch (const std::exception& e) { /* Serial.println("M7 Exc: VentCloseActive"); */ }
+
+    // m4_heater_state is already fetched and indicates heater relay status
+
+    try { auto h = RPC.call("getShadeOpeningActive"); m4_shade_opening_active = h.as<bool>(); }
+    catch (const std::exception& e) { /* Serial.println("M7 Exc: ShadeOpenActive"); */ }
+
+    try { auto h = RPC.call("getShadeClosingActive"); m4_shade_closing_active = h.as<bool>(); }
+    catch (const std::exception& e) { /* Serial.println("M7 Exc: ShadeCloseActive"); */ }
+
+    // --- Update Indicator Box Colors ---
+    // Replace ui_boxVentOpenIndicator etc. with your actual LVGL object names
+    update_indicator_box_color(ui_boxVentOpenIndicator, m4_vent_opening_active);
+    update_indicator_box_color(ui_boxVentCloseIndicator, m4_vent_closing_active);
+    update_indicator_box_color(ui_boxHeaterIndicator, m4_heater_state); // Use the existing m4_heater_state
+    update_indicator_box_color(ui_boxShadeOpenIndicator, m4_shade_opening_active);
+    update_indicator_box_color(ui_boxShadeCloseIndicator, m4_shade_closing_active);
 }
+
 
 unsigned long lastLoopHeartbeat = 0; // For M7 loop debug
 
