@@ -143,14 +143,10 @@ void exchangeDataWithM4AndRefreshUI_LVGL() {
         lv_label_set_text(ui_shadeStatusLabel, shadeStatusBuffer);
     }
 
-/*
-    try { auto h = RPC.call("getM4BoostState"); m4_boost_state = h.as<bool>(); }
-    catch (const std::exception& e)
-    if (ui_boostStatusLabel) { 
-        snprintf(boostStatusBuffer, sizeof(boostStatusBuffer), "Boost: %s", m4_boost_state ? "Active" : "Off");
-        lv_label_set_text(ui_boostStatusLabel, boostStatusBuffer);
-    }
-*/
+    // ---- NEW: Update temperature_system module with current operational states for charting ----
+    updateCurrentVentStageForChart(m4_vent_stage);
+    updateCurrentHeaterStateForChart(m4_heater_state);
+    // ---- END NEW ----
 
   // --- Fetch all configurable settings from M4 into m4_settings_cache ---
     Serial.println("M7: Fetching all settings from M4 for cache..."); // Keep this for now
