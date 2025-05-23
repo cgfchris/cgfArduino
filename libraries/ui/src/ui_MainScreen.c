@@ -21,10 +21,10 @@ void ui_MainScreen_screen_init(void)
     ui_tempLabel = lv_label_create(ui_Panel1);
     lv_obj_set_width(ui_tempLabel, LV_SIZE_CONTENT);   /// 1
     lv_obj_set_height(ui_tempLabel, LV_SIZE_CONTENT);    /// 1
-    lv_obj_set_x(ui_tempLabel, 89);
+    lv_obj_set_x(ui_tempLabel, 210);
     lv_obj_set_y(ui_tempLabel, 77);
-    lv_obj_set_align(ui_tempLabel, LV_ALIGN_CENTER);
-    lv_label_set_text(ui_tempLabel, "25.0");
+    lv_obj_set_align(ui_tempLabel, LV_ALIGN_LEFT_MID);
+    lv_label_set_text(ui_tempLabel, "25.0°C");
     lv_obj_set_style_text_color(ui_tempLabel, lv_color_hex(0xEC0E0E), LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_opa(ui_tempLabel, 255, LV_PART_MAIN | LV_STATE_DEFAULT);
     lv_obj_set_style_text_font(ui_tempLabel, &lv_font_montserrat_36, LV_PART_MAIN | LV_STATE_DEFAULT);

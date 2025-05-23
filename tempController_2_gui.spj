@@ -51,7 +51,7 @@
                     "flags": 17,
                     "strtype": "OBJECT/Position",
                     "intarray": [
-                      89,
+                      210,
                       77
                     ],
                     "InheritedType": 7
@@ -69,7 +69,7 @@
                   {
                     "nid": 70,
                     "strtype": "OBJECT/Align",
-                    "strval": "CENTER",
+                    "strval": "LEFT_MID",
                     "InheritedType": 3
                   },
                   {
@@ -134,7 +134,7 @@
                   {
                     "nid": 1030,
                     "strtype": "LABEL/Text",
-                    "strval": "25.0",
+                    "strval": "25.0°C",
                     "InheritedType": 10
                   },
                   {

@@ -121,7 +121,7 @@ void exchangeDataWithM4AndRefreshUI_LVGL() {
     updateCurrentTemperatureFromM4(m4_reported_temperature);
     if (ui_tempLabel) { 
         if (!isnan(m4_reported_temperature)) {
-            snprintf(tempLabelBufferMain, sizeof(tempLabelBufferMain), "%.1fC", m4_reported_temperature);
+            snprintf(tempLabelBufferMain, sizeof(tempLabelBufferMain), "%.1f °C", m4_reported_temperature);
             lv_label_set_text(ui_tempLabel, tempLabelBufferMain);
         } else { lv_label_set_text(ui_tempLabel, "---C"); }
     }

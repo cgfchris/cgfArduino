@@ -92,7 +92,8 @@ static bool sendUint16SettingToM4(const char* rpcFunctionName, uint16_t newValue
         return false;
     }
 }
-void handle_web_server_clients() {
+void handle_web_server_clients_simple() {
+  // simple version for testing
     if (!serverIsInitialized_ws || !wifiIsCurrentlyConnected_ws) {
         return; 
     }
@@ -222,6 +223,7 @@ void handle_web_server_clients() {
 }
 
 void handle_web_server_clients_basic() {
+  // basic verion for testing nothing much to it
     if (!serverIsInitialized_ws || !wifiIsCurrentlyConnected_ws) {
         return; 
     }
@@ -237,7 +239,8 @@ void handle_web_server_clients_basic() {
     // No complex header reading, no HTML generation, no RPC calls from here.
 }
 
-void handle_web_server_clients_full() {
+void handle_web_server_clients() {
+  // full functional version
     if (!serverIsInitialized_ws || !wifiIsCurrentlyConnected_ws) {
         return;
     }
