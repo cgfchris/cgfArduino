@@ -92,8 +92,152 @@ static bool sendUint16SettingToM4(const char* rpcFunctionName, uint16_t newValue
         return false;
     }
 }
-
 void handle_web_server_clients() {
+    if (!serverIsInitialized_ws || !wifiIsCurrentlyConnected_ws) {
+        return; 
+    }
+
+    WiFiClient client = M7webServer.available();
+
+    if (client) {
+        Serial.println("\nWebServer-DBG: Client connected. IP: " + client.remoteIP().toString());
+        String currentHeaderLine = ""; 
+        unsigned long requestStartTime = millis();
+        bool requestHeadersFullyRead = false;
+        String httpRequestMethod = "";
+        String httpRequestPathAndParams = ""; 
+
+        Serial.println("WebServer-DBG: Reading client request headers...");
+        int headerLineCount = 0;
+        bool firstLineProcessed = false;
+
+        while (client.connected() && (millis() - requestStartTime < 3000)) { // Read headers timeout
+            if (client.available()) {
+                char c = client.read();
+                // Serial.write(c); // Raw dump - enable for deep debug if needed
+
+                if (c == '\n') {
+                    headerLineCount++;
+                    // Serial.print("WebServer-DBG: Header Line " + String(headerLineCount) + ": '"); Serial.print(currentHeaderLine); Serial.println("'");
+
+                    if (!firstLineProcessed) { 
+                        if (currentHeaderLine.startsWith("GET ")) {
+                            httpRequestMethod = "GET";
+                            httpRequestPathAndParams = currentHeaderLine.substring(4); 
+                            if (httpRequestPathAndParams.indexOf(" HTTP/1.1") != -1) {
+                                httpRequestPathAndParams.remove(httpRequestPathAndParams.indexOf(" HTTP/1.1"));
+                            }
+                            httpRequestPathAndParams.trim();
+                        } else if (currentHeaderLine.startsWith("POST ")) {
+                            httpRequestMethod = "POST";
+                            httpRequestPathAndParams = currentHeaderLine.substring(5);
+                            if (httpRequestPathAndParams.indexOf(" HTTP/1.1") != -1) {
+                                httpRequestPathAndParams.remove(httpRequestPathAndParams.indexOf(" HTTP/1.1"));
+                            }
+                            httpRequestPathAndParams.trim();
+                        } 
+                        firstLineProcessed = true;
+                        Serial.print("WebServer-DBG: FirstLine Parsed - Method: '" + httpRequestMethod + "', PathAndParams: '" + httpRequestPathAndParams + "'\n");
+                    }
+
+                    if (currentHeaderLine.length() == 0) { 
+                        Serial.println("WebServer-DBG: End of HTTP headers detected.");
+                        requestHeadersFullyRead = true;
+                        break; 
+                    }
+                    currentHeaderLine = ""; 
+                } else if (c != '\r') {
+                    currentHeaderLine += c;
+                }
+            }
+        } // End while (reading headers)
+
+        if (!requestHeadersFullyRead) {
+            Serial.println("WebServer-DBG: Request headers not fully read (timed out or client disconnected).");
+            client.stop();
+            Serial.println("WebServer-DBG: Client disconnected (incomplete headers).");
+            return;
+        }
+        
+        Serial.println("WebServer-DBG: Processing Request - Method: '" + httpRequestMethod + "', Path: '" + httpRequestPathAndParams + "'");
+        bool sentSpecificResponse = false;
+
+        if (httpRequestMethod == "GET") {
+            if (httpRequestPathAndParams == "/favicon.ico") {
+                Serial.println("WebServer-DBG: Favicon.ico request. Sending 204 No Content.");
+                client.println("HTTP/1.1 204 No Content");
+                client.println("Connection: close");
+                client.println();
+                sentSpecificResponse = true;
+            } else if (httpRequestPathAndParams == "/" || httpRequestPathAndParams.startsWith("/index.html") || httpRequestPathAndParams.length() == 0) {
+                // Serve a VERY simple, mostly static HTML page for this test
+                Serial.println("WebServer-DBG: Serving MINIMAL STATIC test HTML page.");
+                client.println("HTTP/1.1 200 OK");
+                client.println("Content-type:text/html; charset=UTF-8");
+                client.println("Connection: close");
+                client.println();
+                client.println("<!DOCTYPE html><html><head><meta charset='UTF-8'><title>Greenhouse Test (Minimal)</title>");
+                client.println("<style>body{font-family:Helvetica,Arial,sans-serif; margin:20px;}</style></head><body>");
+                client.println("<h1>Greenhouse Controller - Minimal Web Test</h1>");
+                client.println("<p>This is a static test page to check web server stability.</p>");
+                client.println("<p>If you see this, the basic HTTP serving is working.</p>");
+                // You can add one simple dynamic piece of M7 data if you like:
+                client.print("<p>M7 Uptime: "); client.print(millis()/1000); client.println(" seconds.</p>");
+                client.println("</body></html>");
+                sentSpecificResponse = true;
+            } else {
+                // Unknown GET request path
+                Serial.println("WebServer-DBG: Unknown GET path: '" + httpRequestPathAndParams + "'. Sending 404.");
+                client.println("HTTP/1.1 404 Not Found");
+                client.println("Content-Type: text/html");
+                client.println("Connection: close");
+                client.println();
+                client.println("<!DOCTYPE HTML><html><body><h1>404 Not Found</h1><p>The requested URL was not found on this server.</p></body></html>");
+                sentSpecificResponse = true;
+            }
+        } else if (httpRequestMethod.length() > 0) { // If method was parsed but not GET
+            Serial.println("WebServer-DBG: Unsupported HTTP method: '" + httpRequestMethod + "'. Sending 405.");
+            client.println("HTTP/1.1 405 Method Not Allowed");
+            client.println("Allow: GET"); 
+            client.println("Content-Length: 0");
+            client.println("Connection: close");
+            client.println();
+            sentSpecificResponse = true;
+        }
+
+        if (!sentSpecificResponse) {
+            // This case should ideally not be hit if all GETs are handled or 404'd,
+            // and non-GET methods are 405'd. But as a fallback:
+            Serial.println("WebServer-DBG: Request fully read but not specifically handled. Path: '" + httpRequestPathAndParams + "'. Sending generic 404.");
+            client.println("HTTP/1.1 404 Not Found");
+            client.println("Content-Type: text/html");
+            client.println("Connection: close");
+            client.println();
+            client.println("<!DOCTYPE HTML><html><body><h1>404 Not Found</h1><p>Resource not specifically handled.</p></body></html>");
+        }
+        delay(5); 
+        client.stop();
+        Serial.println("WebServer-DBG: Client disconnected.");
+    } // end if(client)
+}
+
+void handle_web_server_clients_basic() {
+    if (!serverIsInitialized_ws || !wifiIsCurrentlyConnected_ws) {
+        return; 
+    }
+
+    WiFiClient client = M7webServer.available();
+    if (client) {
+        Serial.println("WebServer-DBG: Minimal handler - client connected, immediately closing.");
+        client.println("HTTP/1.1 503 Service Unavailable"); // Or 200 OK with tiny message
+        client.println("Connection: close");
+        client.println();
+        client.stop(); 
+    }
+    // No complex header reading, no HTML generation, no RPC calls from here.
+}
+
+void handle_web_server_clients_full() {
     if (!serverIsInitialized_ws || !wifiIsCurrentlyConnected_ws) {
         return;
     }

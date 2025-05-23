@@ -161,7 +161,7 @@ void setRelay(int pin, bool on) {
 void updateM4OwnTemperature() {
     static float simTempM4 = 18.0; 
     static int simTempDirM4 = 1;
-    simTempM4 += 0.20 * simTempDirM4; 
+    simTempM4 += 0.005 * simTempDirM4; 
     if (simTempM4 > 34.0) simTempDirM4 = -1;
     if (simTempM4 < 11.0) simTempDirM4 = 1;
     currentGreenhouseTemp_M4 = simTempM4;
@@ -244,6 +244,13 @@ void setup() {
 }
 
 void loop() {
+    // debug for M4
+    static unsigned long lastM4Print = 0;
+    if (millis() - lastM4Print > 30000) { // Every 30 seconds
+        RPC.println("M4 Uptime: " + String(millis() / 1000) + "s. Temp: " + String(currentGreenhouseTemp_M4));
+        lastM4Print = millis();
+    }
+    
     unsigned long currentTimeMs = millis();
     updateM4OwnTemperature();
 

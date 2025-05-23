@@ -10,16 +10,16 @@
 //#define CHART_Y_MIN_VALUE 0
 //#define CHART_Y_MAX_VALUE 40 // Example for temperature range
 
-// Y-values for chart representation of states on the primary Y-axis
-#define HEATER_STATE_CHART_BASE (CHART_Y_MIN_VALUE + 2)
-#define HEATER_CHART_Y_OFF (CHART_Y_MIN_VALUE + 1) // e.g., 2
-#define HEATER_CHART_Y_ON  (CHART_Y_MIN_VALUE + 10) // e.g., 5 (3-unit jump)
+// Y-values for Heater Status on the chart
+#define HEATER_PLOT_Y_OFF  (CHART_Y_MIN_VALUE + 2)  // e.g., Plot Heater OFF at Y=2
+#define HEATER_PLOT_Y_ON   (CHART_Y_MIN_VALUE + 8)  // e.g., Plot Heater ON  at Y=6 (a 4-unit jump)
 
-#define VENT_STATE_CHART_BASE (CHART_Y_MIN_VALUE + 2)
-#define VENT_CHART_Y_S0    (CHART_Y_MIN_VALUE + 15)  // e.g., 7
-#define VENT_CHART_Y_S1    (CHART_Y_MIN_VALUE + 20)  // e.g., 8
-#define VENT_CHART_Y_S2    (CHART_Y_MIN_VALUE + 25)  // e.g., 9
-#define VENT_CHART_Y_S3    (CHART_Y_MIN_VALUE + 30) // e.g., 10
+// Y-values for Vent Stages on the chart
+// Let's place these above the heater states to avoid overlap
+#define VENT_PLOT_Y_S0     (CHART_Y_MIN_VALUE + 12)  // e.g., Plot Vent Closed (S0) at Y=8
+#define VENT_PLOT_Y_S1     (CHART_Y_MIN_VALUE + 17) // e.g., Plot Vent S1      at Y=10 (2-unit jump per stage)
+#define VENT_PLOT_Y_S2     (CHART_Y_MIN_VALUE + 22) // e.g., Plot Vent S2      at Y=12
+#define VENT_PLOT_Y_S3     (CHART_Y_MIN_VALUE + 27) // e.g., Plot Vent S3      at Y=14
 
 const uint32_t TEMP_SERIES_ID = 0;   // Assuming it's the first series added
 const uint32_t VENT_SERIES_ID = 1;   // Assuming it's the second series added

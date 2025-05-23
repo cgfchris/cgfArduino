@@ -29,7 +29,7 @@ unsigned long lastStatusLabelUpdateMillis = 0; // To throttle "Connecting..." me
 #define WIFI_CONNECT_TIMEOUT_MS 15000UL
 #endif
 #ifndef WIFI_RECONNECT_INTERVAL_MS
-#define WIFI_RECONNECT_INTERVAL_MS 30000UL
+#define WIFI_RECONNECT_INTERVAL_MS 60000UL
 #endif
 #ifndef WIFI_STATUS_LABEL_BUFFER_SIZE // For status messages like "Connecting" AND IP Address
 #define WIFI_STATUS_LABEL_BUFFER_SIZE 32 // Max IP "xxx.xxx.xxx.xxx" is 15 chars + null. "WiFi Connecting..." is ~20. 32 should be safe.
@@ -62,8 +62,8 @@ void initialize_wifi() {
     lastWifiActionMillis = millis();
     lastStatusLabelUpdateMillis = millis(); // Initialize this too
 
-    WiFi.disconnect(); 
-    delay(100);
+    WiFi.disconnect();
+    delay(1000); // Changed from 100ms to 1000ms (1 second)
     WiFi.begin(ssid_local, pass_local);
     
     Serial.println("WiFiMan: WiFi.begin() called. Initial connection process started.");
@@ -90,9 +90,29 @@ void initialize_wifi() {
 }
 
 void manage_wifi_connection() {
-    // Correctly get the WiFi status with a cast
-    wl_status_t current_wl_status = static_cast<wl_status_t>(WiFi.status()); 
+    wl_status_t current_wl_status = static_cast<wl_status_t>(WiFi.status());
     unsigned long current_millis = millis();
+    static wl_status_t prev_wl_status = WL_NO_SHIELD; // Store previous status
+    static WiFiState_Internal prev_internal_state = currentInternalWiFiState;
+
+    if (current_wl_status != prev_wl_status || currentInternalWiFiState != prev_internal_state) {
+        Serial.print(current_millis); Serial.print(" WiFiMan-DBG: InternalState="); Serial.print(currentInternalWiFiState);
+        Serial.print(", WL_Status="); Serial.print(current_wl_status);
+        Serial.print(" (");
+        switch(current_wl_status){ // Optional: print string for status
+            case WL_IDLE_STATUS: Serial.print("IDLE"); break;
+            case WL_NO_SSID_AVAIL: Serial.print("NO_SSID"); break;
+            case WL_SCAN_COMPLETED: Serial.print("SCAN_DONE"); break;
+            case WL_CONNECTED: Serial.print("CONNECTED"); break;
+            case WL_CONNECT_FAILED: Serial.print("CONNECT_FAIL"); break;
+            case WL_CONNECTION_LOST: Serial.print("LOST"); break;
+            case WL_DISCONNECTED: Serial.print("DISCONNECTED"); break;
+            default: Serial.print("UNKNOWN_WL_"); Serial.print(current_wl_status); break;
+        }
+        Serial.println(")");
+        prev_wl_status = current_wl_status;
+        prev_internal_state = currentInternalWiFiState;
+    }
 
     switch (currentInternalWiFiState) {
         case WIFI_S_DISCONNECTED:
@@ -100,7 +120,7 @@ void manage_wifi_connection() {
                 Serial.println("WiFiMan: Reconnect interval. Attempting connection.");
                 update_wifi_status_label("WiFi Reconnecting...");
                 WiFi.disconnect();
-                delay(100);
+                delay(1000); // Changed from 100ms to 1000ms (1 second)
                 WiFi.begin(ssid_local, pass_local);
                 currentInternalWiFiState = WIFI_S_CONNECTING;
                 lastWifiActionMillis = current_millis;
@@ -148,7 +168,7 @@ void manage_wifi_connection() {
                 Serial.println("WiFiMan: Attempting new connection after failure/loss.");
                 update_wifi_status_label("WiFi Retrying...");
                 WiFi.disconnect();
-                delay(100);
+                delay(1000); // Changed from 100ms to 1000ms (1 second)
                 WiFi.begin(ssid_local, pass_local);
                 currentInternalWiFiState = WIFI_S_CONNECTING;
                 lastWifiActionMillis = current_millis;

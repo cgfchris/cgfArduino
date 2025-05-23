@@ -71,6 +71,8 @@ void initializeTemperatureSystem() {
 
     if (ui_tempChart != NULL) {
         lv_chart_set_type(ui_tempChart, LV_CHART_TYPE_LINE);
+        lv_obj_set_style_line_width(ui_tempChart, 2, LV_PART_ITEMS | LV_STATE_DEFAULT); // set linewidth
+        lv_obj_set_style_opa(ui_tempChart, LV_OPA_TRANSP, LV_PART_INDICATOR | LV_STATE_DEFAULT ); // set points to transparent
         lv_chart_set_update_mode(ui_tempChart, LV_CHART_UPDATE_MODE_SHIFT);
         lv_chart_set_point_count(ui_tempChart, MAX_TEMP_SAMPLES);
         lv_chart_set_range(ui_tempChart, LV_CHART_AXIS_PRIMARY_Y, CHART_Y_MIN_VALUE, CHART_Y_MAX_VALUE);
@@ -84,18 +86,35 @@ void initializeTemperatureSystem() {
         // Vent Status Series (e.g., Green)
         ui_tempChartSeriesVent = lv_chart_add_series(ui_tempChart, lv_palette_main(LV_PALETTE_GREEN), LV_CHART_AXIS_PRIMARY_Y);
         if(!ui_tempChartSeriesVent) { Serial.println("M7-TempSys: Error! Failed to add VENT series!"); return; }
-        // lv_chart_set_series_opa(ui_tempChart, ui_tempChartSeriesVent, LV_OPA_70); // Make it slightly transparent if desired
+
+        // this section might have caused the freeze
+        // Style the Vent series: thin line, no points
+        // Assuming Vent series is the SECOND series added (index 1)
+        
+        //lv_obj_set_style_line_opa(ui_tempChart, LV_OPA_70, LV_PART_ITEMS | LV_STATE_DEFAULT | VENT_SERIES_ID); // 70% opaque
+        //lv_obj_set_style_size(ui_tempChart, 5, LV_PART_INDICATOR | LV_STATE_DEFAULT | VENT_SERIES_ID); // Hide points
+        // lv_obj_set_style_line_width(ui_tempChart, 1, LV_PART_ITEMS | VENT_SERIES_ID); // Optional: explicit 1px line
+        //lv_chart_set_series_opa(ui_tempChart, ui_tempChartSeriesVent, LV_OPA_70); // Make it slightly transparent if desired
 
         // Heater Status Series (e.g., Red)
         ui_tempChartSeriesHeater = lv_chart_add_series(ui_tempChart, lv_palette_main(LV_PALETTE_RED), LV_CHART_AXIS_PRIMARY_Y);
         if(!ui_tempChartSeriesHeater) { Serial.println("M7-TempSys: Error! Failed to add HEATER series!"); return; }
-        // lv_chart_set_series_opa(ui_tempChart, ui_tempChartSeriesHeater, LV_OPA_70);
+
+        // this section might have caused the freeze
+        // Style the Heater series: thin line, no points
+        // Assuming Heater series is the THIRD series added (index 2)
+        
+        //lv_obj_set_style_line_opa(ui_tempChart, LV_OPA_70, LV_PART_ITEMS | LV_STATE_DEFAULT | HEATER_SERIES_ID);
+        //lv_obj_set_style_size(ui_tempChart, 0, LV_PART_INDICATOR | LV_STATE_DEFAULT | HEATER_SERIES_ID); // Hide points
+        // lv_obj_set_style_line_width(ui_tempChart, 1, LV_PART_ITEMS | HEATER_SERIES_ID); // Optional: explicit 1px line
+        //lv_chart_set_series_opa(ui_tempChart, ui_tempChartSeriesHeater, LV_OPA_70);
 
         // Initialize all chart points to a baseline
         for (int i = 0; i < MAX_TEMP_SAMPLES; i++) {
-            lv_chart_set_next_value(ui_tempChart, ui_tempChartSeriesTemp, CHART_Y_MIN_VALUE);
-            lv_chart_set_next_value(ui_tempChart, ui_tempChartSeriesVent, (lv_coord_t)VENT_STATE_CHART_BASE + 0);     // Vent closed
-            lv_chart_set_next_value(ui_tempChart, ui_tempChartSeriesHeater, (lv_coord_t)HEATER_STATE_CHART_BASE + 0); // Heater OFF
+            // Initialize all chart points with baseline values
+          lv_chart_set_all_value(ui_tempChart, ui_tempChartSeriesTemp, CHART_Y_MIN_VALUE); // Or a typical starting temp
+          lv_chart_set_all_value(ui_tempChart, ui_tempChartSeriesVent, (lv_coord_t)VENT_PLOT_Y_S0); // Initial vent state
+          lv_chart_set_all_value(ui_tempChart, ui_tempChartSeriesHeater, (lv_coord_t)HEATER_PLOT_Y_OFF); // Initial heater state
         }
         
         // X-axis tick setup (same as before)
@@ -152,22 +171,30 @@ void updateTemperatureSystem() {
             }
         }
 
-        // Vent state data
-        historicalSamples[newestSampleIndex].ventStateNumeric = currentChartVentStage; // Use the M4-sourced value
+        // Vent state data - using new PLOT_Y defines
+        historicalSamples[newestSampleIndex].ventStateNumeric = currentChartVentStage;
         if (ui_tempChart != NULL && ui_tempChartSeriesVent != NULL) {
-            // Plot vent stages slightly above the Y-axis baseline for visibility
-            // Ensure these values are within your CHART_Y_MIN_VALUE and CHART_Y_MAX_VALUE
-            lv_coord_t ventChartVal = (lv_coord_t)(VENT_STATE_CHART_BASE + currentChartVentStage);
-            if (ventChartVal > CHART_Y_MAX_VALUE) ventChartVal = CHART_Y_MAX_VALUE; // Cap it
+            lv_coord_t ventChartVal;
+            switch (currentChartVentStage) {
+                case 0: ventChartVal = VENT_PLOT_Y_S0; break;
+                case 1: ventChartVal = VENT_PLOT_Y_S1; break;
+                case 2: ventChartVal = VENT_PLOT_Y_S2; break;
+                case 3: ventChartVal = VENT_PLOT_Y_S3; break;
+                default: ventChartVal = VENT_PLOT_Y_S0; // Default to closed
+            }
+            // Cap values to chart range (safety, though defines should be within range)
+            if (ventChartVal > CHART_Y_MAX_VALUE) ventChartVal = CHART_Y_MAX_VALUE;
+            if (ventChartVal < CHART_Y_MIN_VALUE) ventChartVal = CHART_Y_MIN_VALUE;
             lv_chart_set_next_value(ui_tempChart, ui_tempChartSeriesVent, ventChartVal);
         }
         
-        // Heater state data
-        historicalSamples[newestSampleIndex].heaterStateNumeric = currentChartHeaterState ? 1 : 0; // Use M4-sourced
+        // Heater state data - using new PLOT_Y defines
+        historicalSamples[newestSampleIndex].heaterStateNumeric = currentChartHeaterState ? 1 : 0;
         if (ui_tempChart != NULL && ui_tempChartSeriesHeater != NULL) {
-            // Plot heater state. Ensure these values are within Y range and distinct from vent
-            lv_coord_t heaterChartVal = (lv_coord_t)(HEATER_STATE_CHART_BASE + (currentChartHeaterState ? 1 : 0));
-            if (heaterChartVal > CHART_Y_MAX_VALUE) heaterChartVal = CHART_Y_MAX_VALUE; // Cap it
+            lv_coord_t heaterChartVal = currentChartHeaterState ? HEATER_PLOT_Y_ON : HEATER_PLOT_Y_OFF;
+            // Cap values to chart range
+            if (heaterChartVal > CHART_Y_MAX_VALUE) heaterChartVal = CHART_Y_MAX_VALUE;
+            if (heaterChartVal < CHART_Y_MIN_VALUE) heaterChartVal = CHART_Y_MIN_VALUE;
             lv_chart_set_next_value(ui_tempChart, ui_tempChartSeriesHeater, heaterChartVal);
         }
 

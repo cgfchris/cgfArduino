@@ -45,7 +45,7 @@ void setup() {
     Serial.begin(115200);
     unsigned long setupStartTime = millis();
     while (!Serial && (millis() - setupStartTime < 1000));
-
+    
     Serial.println("\nM7: Main System Setup Started.");
 
     if (RPC.begin()) {
@@ -208,11 +208,11 @@ void exchangeDataWithM4AndRefreshUI_LVGL() {
 
     // m4_heater_state is already fetched and indicates heater relay status
 
-    try { auto h = RPC.call("getShadeOpeningActive"); m4_shade_opening_active = h.as<bool>(); }
-    catch (const std::exception& e) { /* Serial.println("M7 Exc: ShadeOpenActive"); */ }
+    try { auto h = RPC.call("getShadeOpeningRelayActive"); m4_shade_opening_active = h.as<bool>(); }
+    catch (const std::exception& e) { /* Serial.println("M7 Exc: ShadeOpenRelayActive"); */ }
 
-    try { auto h = RPC.call("getShadeClosingActive"); m4_shade_closing_active = h.as<bool>(); }
-    catch (const std::exception& e) { /* Serial.println("M7 Exc: ShadeCloseActive"); */ }
+    try { auto h = RPC.call("getShadeClosingRelayActive"); m4_shade_closing_active = h.as<bool>(); }
+    catch (const std::exception& e) { /* Serial.println("M7 Exc: ShadeCloseRelayActive"); */ }
 
     // --- Update Indicator Box Colors ---
     // Replace ui_boxVentOpenIndicator etc. with your actual LVGL object names
