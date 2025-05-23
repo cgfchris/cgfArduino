@@ -26,7 +26,7 @@ unsigned long lastStatusLabelUpdateMillis = 0; // To throttle "Connecting..." me
 
 // Ensure these are defined in config.h or here
 #ifndef WIFI_CONNECT_TIMEOUT_MS
-#define WIFI_CONNECT_TIMEOUT_MS 15000UL
+#define WIFI_CONNECT_TIMEOUT_MS 60000UL
 #endif
 #ifndef WIFI_RECONNECT_INTERVAL_MS
 #define WIFI_RECONNECT_INTERVAL_MS 60000UL
@@ -55,6 +55,12 @@ static void update_wifi_status_label_with_ip(IPAddress ip) {
     Serial.print("WiFiMan_UI_Update: IP "); Serial.println(ip);
 }
 
+void wifiStartCommand(){
+    // WiFi.disconnect();
+    // delay(500); 
+    WiFi.begin(ssid_local, pass_local);
+    delay(500); 
+}
 
 void initialize_wifi() {
     Serial.println("WiFiMan: Initializing...");
@@ -62,9 +68,8 @@ void initialize_wifi() {
     lastWifiActionMillis = millis();
     lastStatusLabelUpdateMillis = millis(); // Initialize this too
 
-    WiFi.disconnect();
-    delay(1000); // Changed from 100ms to 1000ms (1 second)
-    WiFi.begin(ssid_local, pass_local);
+    wifiStartCommand();
+    delay(2000); // 2s
     
     Serial.println("WiFiMan: WiFi.begin() called. Initial connection process started.");
     update_wifi_status_label("WiFi Init...");
@@ -119,9 +124,7 @@ void manage_wifi_connection() {
             if (current_millis - lastWifiActionMillis >= WIFI_RECONNECT_INTERVAL_MS) {
                 Serial.println("WiFiMan: Reconnect interval. Attempting connection.");
                 update_wifi_status_label("WiFi Reconnecting...");
-                WiFi.disconnect();
-                delay(1000); // Changed from 100ms to 1000ms (1 second)
-                WiFi.begin(ssid_local, pass_local);
+                wifiStartCommand();
                 currentInternalWiFiState = WIFI_S_CONNECTING;
                 lastWifiActionMillis = current_millis;
                 lastStatusLabelUpdateMillis = current_millis; // Reset for "Connecting..." throttle
@@ -167,9 +170,7 @@ void manage_wifi_connection() {
             if (current_millis - lastWifiActionMillis >= WIFI_RECONNECT_INTERVAL_MS) {
                 Serial.println("WiFiMan: Attempting new connection after failure/loss.");
                 update_wifi_status_label("WiFi Retrying...");
-                WiFi.disconnect();
-                delay(1000); // Changed from 100ms to 1000ms (1 second)
-                WiFi.begin(ssid_local, pass_local);
+                wifiStartCommand();
                 currentInternalWiFiState = WIFI_S_CONNECTING;
                 lastWifiActionMillis = current_millis;
                 lastStatusLabelUpdateMillis = current_millis; // Reset for "Connecting..." throttle

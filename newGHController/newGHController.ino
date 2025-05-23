@@ -2,6 +2,8 @@
 
 #include "Arduino_H7_Video.h"
 #include "Arduino_GigaDisplayTouch.h"
+#include <mbed.h>     // for watchdog
+#include "STM32H747_System.h"  // for getting reset reason
 #include "lvgl.h"
 #include "ui.h"
 #include <RPC.h>
@@ -13,9 +15,11 @@
 #include <Arduino.h>        // Good to have explicitly
 #include "GreenhouseSettingsStruct.h" // Include the shared struct definition
 
-
 Arduino_H7_Video Display(SCREEN_WIDTH, SCREEN_HEIGHT, GigaDisplayShield);
 Arduino_GigaDisplayTouch TouchDetector;
+
+// Watchdog configuration
+const uint32_t REQUESTED_WATCHDOG_TIMEOUT_MS = 30000; // 30 seconds, adjust as needed
 
 unsigned long lastM4DataExchangeTime = 0;
 const unsigned long M4_DATA_EXCHANGE_INTERVAL_MS = 10000;
@@ -38,16 +42,23 @@ char heaterStatusBuffer[15];   // For LVGL ui_heaterStatusLabel
 char shadeStatusBuffer[15];    // For LVGL ui_shadeStatusLabel
 char statusBuffer[15];    // For LVGL any buffer
 
+char reboot_time_String[12]; // store the last reboot time
+const unsigned long LOOP_HEARTBEAT = 60000;
+
+
 // M7's cache of M4's configurable settings
 GreenhouseSettings m4_settings_cache; // M7 will fill this from M4
 
 void setup() {
     Serial.begin(115200);
     unsigned long setupStartTime = millis();
-    while (!Serial && (millis() - setupStartTime < 1000));
+    while (!Serial && (millis() - setupStartTime < 3000));
     
     Serial.println("\nM7: Main System Setup Started.");
-
+    
+    // --- Initialize Watchdog ---
+    watchdog_init();
+    
     if (RPC.begin()) {
         Serial.println("M7: RPC.begin() successful.");
     } else {
@@ -62,15 +73,15 @@ void setup() {
     Serial.println("M7: UI Initialized.");
 
     initialize_wifi(); 
+    
+    initialize_ntp_and_rtc(); // Uses RTC, then tries NTP
+    get_formatted_local_time(reboot_time_String, sizeof(reboot_time_String));
+    get_reset_reason();
 
-    if (is_wifi_connected()) {
-        initialize_ntp_and_rtc(); // Uses RTC, then tries NTP
+    if (is_wifi_connected()) {      
         initialize_web_server();  // <<<< Initialize web server
     } else {
         Serial.println("M7: WiFi not up. NTP and Web Server deferred.");
-        if (ui_time) lv_label_set_text(ui_time, "--:--:--");
-        if (ui_date) lv_label_set_text(ui_date, "No Net Svcs");
-        initialize_ntp_and_rtc(); // Still init RTC part, it will try to use RTC time
     }
 
     initializeTemperatureSystem();
@@ -227,11 +238,17 @@ void exchangeDataWithM4AndRefreshUI_LVGL() {
 unsigned long lastLoopHeartbeat = 0; // For M7 loop debug
 
 void loop() {
+     
+    // --- Kick/Pet the Watchdog at the START of the loop ---
+    // Ensures that if any part of the loop hangs, the watchdog will eventually time out.
+    mbed::Watchdog::get_instance().kick();
+    
     unsigned long currentTimeMs = millis();
     lv_timer_handler();
 
-    if (currentTimeMs - lastLoopHeartbeat >= 60000) {
+    if (currentTimeMs - lastLoopHeartbeat >= LOOP_HEARTBEAT) {
         Serial.println("M7 Loop Heartbeat...");
+        get_reset_reason();
         lastLoopHeartbeat = currentTimeMs;
     }
     
@@ -270,4 +287,106 @@ void loop() {
     }
 
     delay(5);
+}
+
+void watchdog_init() {
+
+    Serial.print("M7: Initializing Watchdog. Requested timeout: ");
+    Serial.print(REQUESTED_WATCHDOG_TIMEOUT_MS);
+    Serial.println(" ms");
+
+    mbed::Watchdog &watchdog = mbed::Watchdog::get_instance();
+
+    uint32_t max_hw_timeout = watchdog.get_max_timeout();
+    Serial.print("M7: Watchdog Max HW Timeout reported by get_max_timeout(): ");
+    Serial.print(max_hw_timeout);
+    Serial.println(" ms");
+
+    uint32_t timeout_to_use = REQUESTED_WATCHDOG_TIMEOUT_MS;
+
+    if (max_hw_timeout == 0) {
+        Serial.println("M7: WARNING - get_max_timeout() returned 0! Watchdog may be unreliable.");
+        // If max is 0, trying to set any timeout might be problematic.
+        // For safety, perhaps don't even try to start it, or use a very small known-to-work value if documented.
+        // For now, let's still try with the requested, but this is an error indicator.
+    } else if (REQUESTED_WATCHDOG_TIMEOUT_MS > max_hw_timeout) {
+        Serial.println("M7: Requested timeout (" + String(REQUESTED_WATCHDOG_TIMEOUT_MS) + 
+                       "ms) > max HW timeout (" + String(max_hw_timeout) + 
+                       "ms). Using max HW timeout instead.");
+        timeout_to_use = max_hw_timeout;
+    }
+    
+    // Ensure timeout_to_use is not zero if we intend to start it.
+    if (timeout_to_use == 0) {
+        Serial.println("M7: CRITICAL - Calculated timeout_to_use is 0. Watchdog will not be started effectively.");
+        return; // Don't start if timeout is 0
+    }
+
+    Serial.print("M7: Attempting to start watchdog with: ");
+    Serial.print(timeout_to_use);
+    Serial.println(" ms");
+
+    if (watchdog.start(timeout_to_use)) {
+        uint32_t actual_configured_timeout = watchdog.get_timeout(); // Get the actual timeout
+        Serial.print("M7: Watchdog successfully started. Actual configured timeout: ");
+        Serial.print(actual_configured_timeout);
+        Serial.println(" ms");
+        if (actual_configured_timeout < 1000 || (timeout_to_use > 1000 && actual_configured_timeout < timeout_to_use / 2) ) { 
+            // If it's very short, or significantly less than requested (and request was reasonable)
+            Serial.println("M7: WARNING - Actual watchdog timeout is much shorter than requested or very small! System may reset frequently.");
+        }
+    } else {
+        Serial.print("M7: CRITICAL WARNING - Watchdog start() FAILED! Status code: ");
+    }
+}
+
+void get_reset_reason(){
+  reset_reason_t resetReason = STM32H747::getResetReason();
+
+  Serial.print("Reboot time: ");
+  Serial.print(reboot_time_String);
+  Serial.print(" Reset reason was: ");
+  switch (resetReason){
+  case RESET_REASON_POWER_ON:
+    Serial.println("Reset Reason Power ON");
+    break;
+  case RESET_REASON_PIN_RESET:
+    Serial.println(  "Reset Reason PIN Reset");
+    break;
+  case RESET_REASON_BROWN_OUT:
+    Serial.println(  "Reset Reason Brown Out");
+    break;
+  case RESET_REASON_SOFTWARE:
+    Serial.println(  "Reset Reason Software");
+    break;
+  case RESET_REASON_WATCHDOG:
+    Serial.println(  "Reset Reason Watchdog");
+    break;
+  case RESET_REASON_LOCKUP:
+    Serial.println(  "Reset Reason Lockup");
+    break;
+  case RESET_REASON_WAKE_LOW_POWER:
+    Serial.println(  "Reset Reason Wake Low Power");
+    break;
+  case RESET_REASON_ACCESS_ERROR:
+    Serial.println(  "Reset Reason Access Error");
+    break;
+  case RESET_REASON_BOOT_ERROR:
+    Serial.println(  "Reset Reason Boot Error");
+    break;
+  case RESET_REASON_MULTIPLE:
+    Serial.println(  "Reset Reason Multiple");
+    break;
+  case RESET_REASON_PLATFORM:
+    Serial.println(  "Reset Reason Platform");
+    break;
+  case RESET_REASON_UNKNOWN:
+    Serial.println(  "Reset Reason Unknown");
+    break;
+  default:
+    Serial.println(  "N/A");
+    break;
+  }
+  
+  
 }
